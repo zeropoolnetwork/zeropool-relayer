@@ -1,0 +1,9 @@
+node_modules
+dist
+
+tree.db
+txs.db
+
+*params.bin
+
+.env
