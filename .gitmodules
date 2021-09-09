@@ -1,0 +1,7 @@
+[submodule "pool-evm-single-l1"]
+	path = pool-evm-single-l1
+	url = https://github.com/zeropoolnetwork/pool-evm-single-l1
+	branch = main
+[submodule "libzeropool-rs"]
+	path = libzeropool-rs
+	url = https://github.com/zeropoolnetwork/libzeropool-rs.git

@@ -1,8 +1,7 @@
 {
   "scripts": {
+    "initialize": "git submodule update --init && npm --prefix libzeropool-rs/libzeropool-rs-node run build",
     "start": "ts-node src/index.ts",
-    "watch:build": "webpack --config webpack.config.js",
-    "watch:server": "nodemon ./dist/main.js --watch ./dist",
     "test": "ts-mocha test/**/*.test.ts"
   },
   "dependencies": {

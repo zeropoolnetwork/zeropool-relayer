@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  ganache:
+    image: trufflesuite/ganache-cli
+    command: --deterministic --gasLimit 20000000 --allowUnlimitedContractSize --chainId 1337
+    ports:
+      - 8545:8545
+  contracts:
+    build: .
+    image: lok52/zp-relayer:latest
+    depends_on:
+      - ganache

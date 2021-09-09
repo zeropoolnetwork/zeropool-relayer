@@ -43,7 +43,7 @@ export class Pool {
   }
 
   async transact(txProof: Proof, treeProof: Proof) {
-    const transferNum = await this.PoolInstance.methods.transfer_num().call()
+    const transferNum: string = await this.PoolInstance.methods.transfer_num().call()
 
     // Construct tx calldata
     const selector: string = this.PoolInstance.methods.transact().encodeABI()
@@ -66,7 +66,7 @@ export class Pool {
     // TODO process different tx types
     // use memo_message from user data
     const tx_type = "01"
-    const memo_size = "08"
+    const memo_size = "0008"
     const memo_fee = "0000000000000000"
     const memo_message = ''
 
@@ -106,10 +106,10 @@ export class Pool {
 
     console.log('TX HASH', res.transactionHash)
 
-    this.txs.add(transferNum, Buffer.from(out_commit.concat(memo_message)))
+    this.txs.add(parseInt(transferNum), Buffer.from(out_commit.concat(memo_message)))
   }
 
-  getDbTx(i: BigInt): [string, string] | null {
+  getDbTx(i: number): [string, string] | null {
     const buf = this.txs.get(i)
     if (!buf) return null
     const data = buf.toString()
@@ -140,6 +140,7 @@ export class Pool {
     // Get state before processing tx
     const root_before = this.tree.getRoot()
     const proof_filled = this.tree.getCommitmentProof(prevCommitIndex)
+    const proof_free = this.tree.getCommitmentProof(nextCommitIndex)
 
     // Fill commitment subtree
     console.log('next index before fill', nextItemIndex)
@@ -149,7 +150,6 @@ export class Pool {
 
     // Get state after processing tx
     const root_after = this.tree.getRoot()
-    const proof_free = this.tree.getCommitmentProof(nextCommitIndex)
     const leaf = this.tree.getNode(OUTLOG, nextCommitIndex)
     const prev_leaf = this.tree.getNode(OUTLOG, prevCommitIndex)
 
@@ -171,6 +171,7 @@ export class Pool {
   async syncState(fromBlock: number | string = 'earliest') {
     const events = await this.PoolInstance.getPastEvents('Message', { fromBlock })
     events.forEach(async ({ returnValues, transactionHash }) => {
+      console.log('EVENT', returnValues)
       const memoString: string = returnValues.message
       if (!memoString) return
       const buf = Buffer.from(memoString)
@@ -185,7 +186,7 @@ export class Pool {
     const localRoot = this.tree.getRoot()
     console.log('LATEST CONTRACT ROOT', contractRoot)
     console.log('LATEST LOCAL ROOT', localRoot)
-    assert(contractRoot == localRoot)
+    assert(contractRoot == localRoot, 'Root mismatch')
   }
 
   getTreeProof(pub: TreePub, sec: TreeSec): Proof {
