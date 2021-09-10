@@ -1,3 +1,8 @@
 **/node_modules/
-libzeropool-rs/
+**/target
 **/.git
+build
+tree.db
+txs.db
+dist
+.env*

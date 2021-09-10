@@ -6,8 +6,30 @@ services:
     command: --deterministic --gasLimit 20000000 --allowUnlimitedContractSize --chainId 1337
     ports:
       - 8545:8545
-  contracts:
-    build: .
+  verifier:
+    image: lok52/verifier:latest
+    build:
+      context: ./docker
+      dockerfile: Dockerfile.verifier
+  relayer:
     image: lok52/zp-relayer:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.relayer
+      args:
+        - VERIFIER_IMAGE=lok52/verifier:latest
+    env_file: .env
+    ports:
+      - 8000:8000
     depends_on:
+      - verifier
+  contracts:
+    image: lok52/zp-contracts:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.contracts
+      args:
+        - VERIFIER_IMAGE=lok52/verifier:latest
+    depends_on:
+      - verifier
       - ganache
