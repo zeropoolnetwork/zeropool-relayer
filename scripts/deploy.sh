@@ -9,12 +9,13 @@ cleanup() {
 }
 cleanup
 
-docker-compose build
+docker-compose build contracts
 
-echo "Copy tree_params.bin to local machine"
-c_id=$(docker create lok52/zp-relayer)
+echo "Copy params to local machine"
+c_id=$(docker create lok52/verifier)
 echo $c_id
 docker cp $c_id:/app/tree_params.bin ./tree_params.bin 
+docker cp $c_id:/app/tx_params.bin ./tx_params.bin 
 
 echo "Starting our own ganache instance"
 docker-compose up ganache &

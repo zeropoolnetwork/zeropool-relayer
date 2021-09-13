@@ -14,15 +14,9 @@ COPY ./pool-evm-single-l1/ ./
 COPY --from=verifier /app/TreeVerifier.sol /app/contracts/
 COPY --from=verifier /app/TransferVerifier.sol /app/contracts/
 
-COPY --from=verifier /app/tree_params.bin /app/
-COPY --from=verifier /app/tx_params.bin /app/
-
-COPY --from=verifier /app/tree_vk.json /app/
-COPY --from=verifier /app/tx_vk.json /app/
-
 RUN npx hardhat compile
 
 ENV MOCK_TREE_VERIFIER=false
-ENV MOCK_TX_VERIFIER=true
+ENV MOCK_TX_VERIFIER=false
 
 CMD npx hardhat run --network docker scripts/deploy-task.js
