@@ -18,6 +18,8 @@ services:
       dockerfile: docker/Dockerfile.relayer
       args:
         - VERIFIER_IMAGE=lok52/verifier:latest
+    volumes:
+      - ./tree.db:/app/tree.db
     env_file: .env
     ports:
       - 8000:8000

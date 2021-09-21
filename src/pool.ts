@@ -2,15 +2,15 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 import Web3 from 'web3'
-import { toBN } from 'web3-utils'
 import { Contract } from 'web3-eth-contract'
 import PoolAbi from './abi/pool-abi.json'
-import { AbiItem } from 'web3-utils'
-import { Params, TreePub, TreeSec, SnarkProof, Proof, MerkleTree, TxStorage, Helpers } from 'libzeropool-rs-node'
+import { AbiItem, toBN } from 'web3-utils'
+import { Params, TreePub, TreeSec, SnarkProof, Proof, MerkleTree, TxStorage, Helpers, MerkleProof, TransferPub, TransferSec } from 'libzeropool-rs-node'
 import { decodeMemo } from './memo'
 import { assert } from 'console'
 import { signAndSend } from './tx/signAndSend'
-import { OUTLOG } from './utils/constants'
+import { OUTLOG, BALANCE_SIZE, ENERGY_SIZE, HEIGHT } from './utils/constants'
+import { TxType } from './utils/helpers'
 
 const {
   RPC_URL,
@@ -21,7 +21,7 @@ const {
 export class Pool {
   private PoolInstance: Contract
   private treeParams: Params
-  tree: MerkleTree
+  private tree: MerkleTree
   private txs: TxStorage
   private web3: Web3
   curIndex: bigint
@@ -37,38 +37,48 @@ export class Pool {
     this.syncState()
   }
 
-  toHex(n: string, pad = 64) {
-    const hex = this.web3.utils.numberToHex(n).slice(2)
+  getTxProof(pub: TransferPub, sec: TransferSec) {
+    const params = Params.fromFile('./transfer_params.bin')
+    return Proof.tx(params, pub, sec)
+  }
+
+  numToHex(n: string, pad = 64) {
+    let num = toBN(n)
+    if (num.isNeg()) {
+      let a = toBN(2).pow(toBN(pad * 4))
+      num = a.sub(num.neg())
+    }
+    const hex = this.web3.utils.numberToHex(num).slice(2)
+    assert(hex.length <= pad, 'hex size overflow')
     return this.web3.utils.padLeft(hex, pad)
   }
 
-  async transact(txProof: Proof, treeProof: Proof) {
+  async transact(txProof: Proof, treeProof: Proof, memo: Buffer, txType: TxType = TxType.TRANSFER) {
     const transferNum: string = await this.PoolInstance.methods.transfer_num().call()
 
     // Construct tx calldata
     const selector: string = this.PoolInstance.methods.transact().encodeABI()
 
-    const nullifier = this.toHex(txProof.inputs[1])
-    const out_commit = this.toHex(treeProof.inputs[2])
+    const nullifier = this.numToHex(txProof.inputs[1])
+    const out_commit = this.numToHex(treeProof.inputs[2])
 
     assert(treeProof.inputs[2] == txProof.inputs[2], 'commmitment error')
 
-    // TODO Should be taken from public input delta
-    const transfer_index = this.toHex(transferNum, 12)
-    const enery_amount = "0000000000000000000000000000"
-    const token_amount = "0000000000000000"
+    const delta = Helpers.parseDelta(txProof.inputs[3])
+    const transfer_index = this.numToHex(delta.index, 12)
+    const enery_amount = this.numToHex(delta.e, 16)
+    const token_amount = this.numToHex(delta.v, 16)
 
     const transact_proof = this.flattenProof(txProof.proof)
 
-    const root_after = this.toHex(treeProof.inputs[1])
+    const root_after = this.numToHex(treeProof.inputs[1])
     const tree_proof = this.flattenProof(treeProof.proof)
 
     // TODO process different tx types
     // use memo_message from user data
-    const tx_type = "01"
-    const memo_size = "0008"
-    const memo_fee = "0000000000000000"
-    const memo_message = ''
+    const tx_type = txType
+    const memo_message = memo.toString('hex')
+    const memo_size = this.numToHex((memo_message.length / 2).toString(), 4)
 
     const data = [
       selector,
@@ -82,7 +92,6 @@ export class Pool {
       tree_proof,
       tx_type,
       memo_size,
-      memo_fee,
       memo_message
     ].join('')
 
@@ -127,10 +136,9 @@ export class Pool {
     return Helpers.outCommitmentHash(out_hashes)
   }
 
-  processMemo(memoString: string) {
+  processMemo(memoBlock: Buffer, txType: TxType) {
     // Decode memo block
-    const buf = Buffer.from(memoString, 'base64')
-    const memo = decodeMemo(buf)
+    const memo = decodeMemo(memoBlock, txType)
     const notes = memo.getNotes()
 
     const nextItemIndex = this.tree.getNextIndex()
@@ -171,11 +179,15 @@ export class Pool {
   async syncState(fromBlock: number | string = 'earliest') {
     const events = await this.PoolInstance.getPastEvents('Message', { fromBlock })
     events.forEach(async ({ returnValues, transactionHash }) => {
-      console.log('EVENT', returnValues)
+      // console.log('EVENT', returnValues)
+      const txType: TxType = returnValues.txType
       const memoString: string = returnValues.message
       if (!memoString) return
-      const buf = Buffer.from(memoString)
-      const memo = decodeMemo(buf)
+      const b = this.web3.utils.hexToUtf8(memoString)
+      const buf = Buffer.from(b, 'base64')
+      console.log(buf)
+      const memo = decodeMemo(buf, txType)
+      console.log(memo)
       const notes = memo.getNotes()
 
       this.tree.appendHash(memo.accHash)
@@ -201,8 +213,20 @@ export class Pool {
 
   private flattenProof(p: SnarkProof): string {
     return [p.a, p.b.flat(), p.c].flat().map(n => {
-      const hex = this.toHex(n)
+      const hex = this.numToHex(n)
       return hex
     }).join('')
+  }
+
+  getMerkleProof(noteIndex: number): MerkleProof {
+    return this.tree.getProof(noteIndex)
+  }
+
+  getTransactions(limit: number, offset: number) {
+    const txs: (Buffer | null)[] = new Array(limit)
+    for (let i = offset; i < offset + limit; i++) {
+      txs.push(this.txs.get(i))
+    }
+    return txs
   }
 }

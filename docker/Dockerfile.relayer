@@ -26,11 +26,13 @@ WORKDIR /app
 COPY --from=libzeropool-rs /app/libzeropool-rs/libzeropool-rs-node/ /app/libzeropool-rs/libzeropool-rs-node/
 COPY ./package.json ./
 COPY ./yarn.lock ./
+
+RUN yarn install --frozen-lockfile
+
 COPY ./tsconfig.json ./
 COPY ./src ./src
 
-RUN yarn install --frozen-lockfile && \
-    yarn build
+RUN yarn build
 
 
 FROM node:16
@@ -42,7 +44,7 @@ COPY --from=verifier /app/tx_params.bin /app/
 
 COPY --from=libzeropool-rs /app/libzeropool-rs/libzeropool-rs-node/ /app/libzeropool-rs/libzeropool-rs-node/
 
-COPY --from=build /app/build ./build
+COPY --from=build /app/build/src ./build/src
 COPY ./package.json ./
 COPY ./yarn.lock ./
 

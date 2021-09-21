@@ -81,7 +81,7 @@ export default class HttpListProvider {
   }
 
   async trySend(payload: any, initialIndex: number) {
-    const errors = []
+    const errors: any = []
   
     for (let count = 0; count < this.urls.length; count++) {
       const index = (initialIndex + count) % this.urls.length

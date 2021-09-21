@@ -17,10 +17,14 @@ yarn initialize
 3. Add `.env` configuration file
 
 4. Start relayer
-
-```bash
-yarn start
-```
+    * Locally
+    ```bash
+    yarn start:dev
+    ```
+    * Using docker
+    ```bash
+    docker-compose up relayer
+    ```
 
 ## Test
 
