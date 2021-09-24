@@ -8,15 +8,21 @@
 yarn initialize
 ```
 
-2. Start local ganache and deploy contracts
+2. Copy proving params to local machine
+
+```bash
+./scripts/copy_params.sh
+```
+
+3. Add `.env` configuration file
+
+4. Start local ganache and deploy contracts
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-3. Add `.env` configuration file
-
-4. Start relayer
+5. Start relayer
     * Locally
     ```bash
     yarn start:dev

@@ -14,8 +14,10 @@ app.use(express.text())
 
 // Used only for testing as proving on client is now slow
 app.post('/proof_tx', (req, res) => {
+  console.log('Proving tx...')
   const {pub, sec} = JSON.parse(req.body)
   const proof = pool.getTxProof(pub, sec)
+  console.log('proved')
   res.json(proof)
 })
 
@@ -34,11 +36,11 @@ app.get('/merkle/proof/:index(\d+)', (req, res) => {
 
 
 app.post('/transaction', (req, res) => {
-  const { proof, memo, txType } = JSON.parse(req.body)
+  const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
   const buf = Buffer.from(memo, 'base64')
   const treeProof = pool.processMemo(buf, txType)
-  pool.transact(proof, treeProof, buf, txType)
-  res.sendStatus(204)
+  pool.transact(proof, treeProof, buf, txType, depositSignature)
+  res.json('OK')
 })
 
 app.listen(PORT, () => console.log(`Started relayer on port ${PORT}`))

@@ -1,0 +1,1 @@
+npx mocha-chrome index.html --chrome-flags '["--disable-web-security"]' --mocha '{"timeout": 100000}'

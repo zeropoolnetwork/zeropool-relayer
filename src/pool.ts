@@ -42,18 +42,25 @@ export class Pool {
     return Proof.tx(params, pub, sec)
   }
 
+  truncateHexPrefix(data: string) {
+    if (data.startsWith('0x')) {
+      data = data.slice(2)
+    }
+    return data
+  }
+
   numToHex(n: string, pad = 64) {
     let num = toBN(n)
     if (num.isNeg()) {
       let a = toBN(2).pow(toBN(pad * 4))
       num = a.sub(num.neg())
     }
-    const hex = this.web3.utils.numberToHex(num).slice(2)
+    const hex = this.truncateHexPrefix(this.web3.utils.numberToHex(num))
     assert(hex.length <= pad, 'hex size overflow')
     return this.web3.utils.padLeft(hex, pad)
   }
 
-  async transact(txProof: Proof, treeProof: Proof, memo: Buffer, txType: TxType = TxType.TRANSFER) {
+  async transact(txProof: Proof, treeProof: Proof, memo: Buffer, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
     const transferNum: string = await this.PoolInstance.methods.transfer_num().call()
 
     // Construct tx calldata
@@ -93,7 +100,12 @@ export class Pool {
       tx_type,
       memo_size,
       memo_message
-    ].join('')
+    ]
+
+    if (depositSignature) {
+      depositSignature = this.truncateHexPrefix(depositSignature)
+      data.push(depositSignature)
+    }
 
     // TODO move to config
     const address = this.web3.eth.accounts.privateKeyToAccount(RELAYER_ADDRESS_PRIVATE_KEY).address
@@ -101,7 +113,7 @@ export class Pool {
     console.log('nonce', nonce)
     const res = await signAndSend(
       RELAYER_ADDRESS_PRIVATE_KEY,
-      data,
+      data.join(''),
       nonce,
       // TODO gasPrice
       '',
@@ -163,6 +175,7 @@ export class Pool {
 
     assert(Pool.outCommit(memo.accHash, notes) === leaf, 'WRONG COMMIT')
 
+    console.log('Proving tree')
     const proof = this.getTreeProof({
       root_before,
       root_after,
@@ -172,6 +185,7 @@ export class Pool {
       proof_free,
       prev_leaf,
     })
+    console.log('proved')
 
     return proof
   }

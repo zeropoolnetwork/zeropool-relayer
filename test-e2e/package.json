@@ -1,0 +1,23 @@
+{
+  "name": "test-e2e",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "build:dev": "webpack --mode=development",
+    "build:prod": "webpack --mode=production --node-env=production"
+  },
+  "dependencies": {
+    "http-server": "^13.0.2",
+    "libzeropool-rs-wasm-bundler": "link:../libzeropool-rs/libzeropool-rs-wasm/bundler",
+    "node-polyfill-webpack-plugin": "^1.1.4",
+    "stream-http": "^3.2.0",
+    "webpack": "^5.46.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "json-loader": "^0.5.7",
+    "mocha": "6.2.2",
+    "mocha-chrome": "^2.2.0"
+  }
+}

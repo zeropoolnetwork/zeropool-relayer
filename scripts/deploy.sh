@@ -9,6 +9,8 @@ cleanup() {
 }
 cleanup
 
+docker-compose build contracts
+
 echo "Starting our own ganache instance"
 docker-compose up ganache &
 pid=$!
