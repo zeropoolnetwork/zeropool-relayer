@@ -2,6 +2,8 @@
 
 set -e
 
+trap cleanup EXIT
+
 cleanup() {
   if [ "$KEEP_RUNNING" != true ]; then
     docker-compose down

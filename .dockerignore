@@ -6,3 +6,5 @@ tree.db
 txs.db
 dist
 .env*
+test
+test-e2e

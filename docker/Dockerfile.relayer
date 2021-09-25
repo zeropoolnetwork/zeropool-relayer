@@ -40,7 +40,7 @@ FROM node:16
 WORKDIR /app
 
 COPY --from=verifier /app/tree_params.bin /app/
-COPY --from=verifier /app/tx_params.bin /app/
+COPY --from=verifier /app/tx_params.bin /app/transfer_params.bin
 
 COPY --from=libzeropool-rs /app/libzeropool-rs/libzeropool-rs-node/ /app/libzeropool-rs/libzeropool-rs-node/
 

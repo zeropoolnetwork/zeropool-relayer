@@ -1,8 +1,9 @@
 import Web3 from 'web3'
 import { toBN } from 'web3-utils'
-import { UserAccount, UserState, Params } from 'libzeropool-rs-wasm-bundler';
+import { UserAccount, UserState } from 'libzeropool-rs-wasm-bundler';
 import TokenAbi from './token-abi.json'
-import { base64ToArrayBuffer, sleep, deleteDb, postData, concatArrays, numToHex, fakeTxProof, packSignature } from './utils'
+import { base64ToArrayBuffer, deleteDb, postData, concatArrays, numToHex, fakeTxProof, packSignature } from './utils'
+import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK } from './constants.json'
 
 export function syncAcc(account: UserAccount, tx: any, n: number) {
   let buf = base64ToArrayBuffer(tx.ciphertext)
@@ -37,7 +38,7 @@ async function proofAndSend(mergeTx: any, fake: boolean, txType: string, deposit
   } else {
     let rawProof = Uint8Array.from([])
     console.log('Getting proof from relayer...')
-    await postData('http://localhost:8000/proof_tx', { pub: mergeTx.public, sec: mergeTx.secret })
+    await postData(`${relayerUrl}/proof_tx`, { pub: mergeTx.public, sec: mergeTx.secret })
       .then(async response => {
         const reader = response.body.getReader()
         let f = false
@@ -62,19 +63,14 @@ async function proofAndSend(mergeTx: any, fake: boolean, txType: string, deposit
     depositSignature,
   }
 
-  await postData('http://localhost:8000/transaction', data)
+  await postData(`${relayerUrl}/transaction`, data)
     .then(data => {
       console.log(data)
     })
 }
 
-// Default from ganache
-const privateKey = '0x6cbed15c793ce57650b9877cf6fa156fbef513c4e6134f022a85b1ffdd59b2a1'
-
-export const web3 = new Web3('ws://127.0.0.1:8545')
-export const CONTRACT_ADDRESS = '0xd833215cbcc3f914bd1c9ece3ee7bf8b14f841bb'
-export const TOKEN_ADDRESS = '0x254dffcd3277c0b1660f6d42efbb754edababc2b'
-export const token = new web3.eth.Contract(TokenAbi as any, TOKEN_ADDRESS)
+export const web3 = new Web3(rpcUrl)
+export const token = new web3.eth.Contract(TokenAbi as any, tokenAddress)
 export const denominator = toBN(1000000000)
 const zero_fee = new Uint8Array(8).fill(0)
 const zero_amount = new Uint8Array(8).fill(0)
@@ -97,12 +93,12 @@ export async function createAccount() {
 export async function deposit(account: UserAccount, from: string, amount: string, fake = false) {
   const amounBN = toBN(amount)
   console.log('Approving tokens...')
-  await token.methods.approve(CONTRACT_ADDRESS, amounBN.mul(denominator)).send({ from })
+  await token.methods.approve(zpAddress, amounBN.mul(denominator)).send({ from })
   console.log('Making a deposit...')
   const mergeTx = await account.createTx('deposit', amount, zero_fee)
   const depositSignature = web3.eth.accounts.sign(
     numToHex(web3, mergeTx.public.nullifier),
-    privateKey
+    clientPK
   )
   await proofAndSend(mergeTx, fake, '00', packSignature(depositSignature))
   return mergeTx
