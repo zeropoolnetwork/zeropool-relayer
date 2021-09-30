@@ -1,54 +1,92 @@
-import { createAccount, deposit, transfer, withdraw, syncAcc, getTokenBalance, denominator } from './zp'
-import { sleep, addressToUint8 } from './utils'
 import { toBN } from 'web3-utils'
+import { sleep, addressToUint8 } from './utils'
+import {
+  createAccount,
+  deposit,
+  transfer,
+  withdraw,
+  getBalanceDiff,
+  denominator,
+  syncAccounts,
+  token,
+  getEnergyBalance
+} from './zp'
 
-const assert = chai.assert
 const expect = chai.expect
 
 describe('ZP client', () => {
   describe('Simple user flow', () => {
+    let mergeTx
+    let balanceDiff
+    let energyBalance
     it('can deposit-transfer-withdraw', async () => {
+      const minter = '0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1'
       const from = '0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0'
 
-      const account = await createAccount()
-      const accountOther = await createAccount()
+      const account = await createAccount([1, 2, 3])
+      const accountOther = await createAccount([4, 5, 6])
 
-      let ZPBalance = account.totalBalance()
-      expect(ZPBalance).eq('0')
+      await syncAccounts([account, accountOther])
 
-      let tokenBalance = await getTokenBalance(from)
-      expect(tokenBalance).eq(denominator.mul(toBN(10)).toString())
+      expect(account.totalBalance()).eq('0')
+      expect(accountOther.totalBalance()).eq('0')
 
-      let mergeTx
-      mergeTx = await deposit(account, from, '2')
-      syncAcc(account, mergeTx, 0)
+      // Give 10 tokens
+      balanceDiff = await getBalanceDiff(from, async () => {
+        await token.methods.mint(from, denominator.mul(toBN(10)).toString()).send({ from: minter })
+      })
+      expect(balanceDiff).eq(denominator.mul(toBN(10)).toString())
 
-      ZPBalance = account.totalBalance()
-      expect(ZPBalance).eq('2')
+      // Deposit
+      balanceDiff = await getBalanceDiff(from, async () => {
+        mergeTx = await deposit(account, from, '5')
+      })
+      await syncAccounts([account, accountOther])
 
-      tokenBalance = await getTokenBalance(from)
-      expect(tokenBalance).eq(denominator.mul(toBN(8)).toString())
-
+      expect(balanceDiff).eq(denominator.mul(toBN(-5)).toString())
+      expect(account.totalBalance()).eq('5')
+      expect(accountOther.totalBalance()).eq('0')
 
       await sleep(10000)
 
+      // Transfer
       mergeTx = await transfer(account, accountOther.generateAddress(), '1')
-      syncAcc(account, mergeTx, 1)
+      await syncAccounts([account, accountOther])
 
-      ZPBalance = account.totalBalance()
-      expect(ZPBalance).eq('1')
+      expect(account.totalBalance()).eq('4')
+      expect(accountOther.totalBalance()).eq('1')
 
       await sleep(10000)
 
-      mergeTx = await withdraw(account, addressToUint8(from), '1')
-      syncAcc(account, mergeTx, 2)
-      ZPBalance = account.totalBalance()
-      expect(ZPBalance).eq('0')
+      // Withdraw from first account
+      balanceDiff = await getBalanceDiff(from, async () => {
+        mergeTx = await withdraw(account, addressToUint8(from), '2')
+      })
+      await syncAccounts([account, accountOther])
 
-      tokenBalance = await getTokenBalance(from)
-      expect(tokenBalance).eq(denominator.mul(toBN(9)).toString())
+      energyBalance = await getEnergyBalance(from)
+      expect(energyBalance).eq(denominator.mul(toBN(1152)).toString())
 
-      assert.equal(true, true)
+      expect(balanceDiff).eq(denominator.mul(toBN(2)).toString())
+      expect(account.totalBalance()).eq('2')
+      expect(accountOther.totalBalance()).eq('1')
+
+      await sleep(10000)
+
+      // Withdraw from second account
+      balanceDiff = await getBalanceDiff(from, async () => {
+        mergeTx = await withdraw(accountOther, addressToUint8(from), '1')
+      })
+      await syncAccounts([account, accountOther])
+
+      energyBalance = await getEnergyBalance(from)
+      // 1152 from previous + 255 from this one
+      expect(energyBalance).eq(denominator.mul(toBN(1407)).toString())
+
+      expect(balanceDiff).eq(denominator.mul(toBN(1)).toString())
+      expect(account.totalBalance()).eq('2')
+      expect(accountOther.totalBalance()).eq('0')
+
     });
   });
 });

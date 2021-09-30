@@ -8,3 +8,6 @@ txs.db
 *params.bin
 
 .env
+
+# Log file
+zp.log

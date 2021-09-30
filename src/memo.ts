@@ -61,12 +61,17 @@ function memoBorshSchema(numNotes = 127) {
   }]])
 }
 
-export function decodeMemo(data: Buffer, txType: TxType) {
+export function decodeMemo(data: Buffer, txType: TxType | null) {
   const reader = new BinaryReader(data)
-  const fee = reader.readU64()
-  if (txType === TxType.WITHDRAWAL) {
-    const amount = reader.readU64()
-    const addres = reader.readFixedArray(20)
+  if (txType) {
+    const fee = reader.readU64()
+    if (txType === TxType.WITHDRAWAL) {
+      const amount = reader.readU64()
+      const addres = reader.readFixedArray(20)
+      console.log(amount)
+      console.log(addres)
+    }
+    console.log(fee)
   }
   const numItems = new DataView(reader.readFixedArray(4).buffer).getUint32(0, true)
   const memo: Memo = deserialize(memoBorshSchema(numItems - 1), Memo, data.slice(reader.offset))

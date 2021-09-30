@@ -5,11 +5,10 @@ import Web3 from 'web3'
 import { Contract } from 'web3-eth-contract'
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
-import { Params, TreePub, TreeSec, SnarkProof, Proof, MerkleTree, TxStorage, Helpers, MerkleProof, TransferPub, TransferSec } from 'libzeropool-rs-node'
+import { Params, TreePub, TreeSec, SnarkProof, Proof, MerkleTree, TxStorage, Helpers, MerkleProof, TransferPub, TransferSec, Constants } from 'libzeropool-rs-node'
 import { decodeMemo } from './memo'
 import { assert } from 'console'
 import { signAndSend } from './tx/signAndSend'
-import { OUTLOG, BALANCE_SIZE, ENERGY_SIZE, HEIGHT } from './utils/constants'
 import { TxType } from './utils/helpers'
 
 const {
@@ -21,10 +20,9 @@ const {
 export class Pool {
   private PoolInstance: Contract
   private treeParams: Params
-  private tree: MerkleTree
+  public tree: MerkleTree
   private txs: TxStorage
   private web3: Web3
-  curIndex: bigint
 
   constructor() {
     this.web3 = new Web3(RPC_URL)
@@ -32,7 +30,6 @@ export class Pool {
     this.treeParams = Params.fromFile('./tree_params.bin')
     this.tree = new MerkleTree('./tree.db')
     this.txs = new TxStorage('./txs.db')
-    this.curIndex = BigInt(0)
 
     this.syncState()
   }
@@ -81,8 +78,6 @@ export class Pool {
     const root_after = this.numToHex(treeProof.inputs[1])
     const tree_proof = this.flattenProof(treeProof.proof)
 
-    // TODO process different tx types
-    // use memo_message from user data
     const tx_type = txType
     const memo_message = memo.toString('hex')
     const memo_size = this.numToHex((memo_message.length / 2).toString(), 4)
@@ -124,10 +119,11 @@ export class Pool {
       await this.web3.eth.getChainId(),
       this.web3
     )
-
+    // 16 + 16 + 40
     console.log('TX HASH', res.transactionHash)
-
-    this.txs.add(parseInt(transferNum), Buffer.from(out_commit.concat(memo_message)))
+    let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
+    const truncatedMemo = memo_message.slice(txSpecificPrefixLen)
+    this.txs.add(parseInt(transferNum), Buffer.from(out_commit.concat(truncatedMemo), 'hex'))
   }
 
   getDbTx(i: number): [string, string] | null {
@@ -151,6 +147,7 @@ export class Pool {
   processMemo(memoBlock: Buffer, txType: TxType) {
     // Decode memo block
     const memo = decodeMemo(memoBlock, txType)
+    console.log('Decoded memo block')
     const notes = memo.getNotes()
 
     const nextItemIndex = this.tree.getNextIndex()
@@ -158,7 +155,7 @@ export class Pool {
     const prevCommitIndex = nextCommitIndex - 1
 
     // Get state before processing tx
-    const root_before = this.tree.getRoot()
+    const root_before = this.getLocalMerkleRoot()
     const proof_filled = this.tree.getCommitmentProof(prevCommitIndex)
     const proof_free = this.tree.getCommitmentProof(nextCommitIndex)
 
@@ -169,9 +166,9 @@ export class Pool {
     console.log('next index after fill', this.tree.getNextIndex())
 
     // Get state after processing tx
-    const root_after = this.tree.getRoot()
-    const leaf = this.tree.getNode(OUTLOG, nextCommitIndex)
-    const prev_leaf = this.tree.getNode(OUTLOG, prevCommitIndex)
+    const root_after = this.getLocalMerkleRoot()
+    const leaf = this.tree.getNode(Constants.OUTLOG, nextCommitIndex)
+    const prev_leaf = this.tree.getNode(Constants.OUTLOG, prevCommitIndex)
 
     assert(Pool.outCommit(memo.accHash, notes) === leaf, 'WRONG COMMIT')
 
@@ -191,37 +188,49 @@ export class Pool {
   }
 
   async syncState(fromBlock: number | string = 'earliest') {
-    const events = await this.PoolInstance.getPastEvents('Message', { fromBlock })
-    events.forEach(async ({ returnValues, transactionHash }) => {
-      // console.log('EVENT', returnValues)
-      const txType: TxType = returnValues.txType
-      const memoString: string = returnValues.message
-      if (!memoString) return
-      const b = this.web3.utils.hexToUtf8(memoString)
-      const buf = Buffer.from(b, 'base64')
-      console.log(buf)
-      const memo = decodeMemo(buf, txType)
-      console.log(memo)
-      const notes = memo.getNotes()
-
-      this.tree.appendHash(memo.accHash)
-      this.appendHashes(notes)
-    })
-
-    const contractRoot = await this.curRoot()
-    const localRoot = this.tree.getRoot()
+    const contractRoot = await this.getContractMerkleRoot(null)
+    let localRoot = this.getLocalMerkleRoot()
     console.log('LATEST CONTRACT ROOT', contractRoot)
     console.log('LATEST LOCAL ROOT', localRoot)
-    assert(contractRoot == localRoot, 'Root mismatch')
+    if (contractRoot !== localRoot) {
+      console.log('ROOT MISMATCH')
+
+      // Zero out existing hashes
+      const nextIndex = this.tree.getNextIndex()
+      for (let i = 0; i < nextIndex; i++) {
+        const emptyHash = Buffer.alloc(32)
+        this.tree.addHash(i, emptyHash)
+      }
+
+      const events = await this.PoolInstance.getPastEvents('Message', { fromBlock })
+      let leafIndex = 0
+      events.forEach(async ({ returnValues, transactionHash }) => {
+        const memoString: string = returnValues.message
+        if (!memoString) return
+        const buf = Buffer.from(memoString.slice(2), 'hex')
+        const memo = decodeMemo(buf, null)
+        const notes = memo.getNotes()
+
+        this.tree.addHash(leafIndex, memo.accHash)
+        for (let i = 0; i < 127; i++) {
+          this.tree.addHash(leafIndex + i + 1, notes[i])
+        }
+        leafIndex += 128
+      })
+      localRoot = this.getLocalMerkleRoot()
+      console.log('LATEST LOCAL ROOT AFTER UPDATE', localRoot)
+    }
   }
 
   getTreeProof(pub: TreePub, sec: TreeSec): Proof {
     return Proof.tree(this.treeParams, pub, sec)
   }
 
-  private async curRoot(): Promise<string> {
-    const numTx = await this.PoolInstance.methods.transfer_num().call()
-    const root = await this.PoolInstance.methods.roots(numTx).call()
+  async getContractMerkleRoot(index: string | undefined | null): Promise<string> {
+    if (!index) {
+      index = await this.PoolInstance.methods.transfer_num().call()
+    }
+    const root = await this.PoolInstance.methods.roots(index).call()
     return root.toString()
   }
 
@@ -232,14 +241,19 @@ export class Pool {
     }).join('')
   }
 
+  getLocalMerkleRoot(): string {
+    return this.tree.getRoot()
+  }
+
   getMerkleProof(noteIndex: number): MerkleProof {
     return this.tree.getProof(noteIndex)
   }
 
   getTransactions(limit: number, offset: number) {
     const txs: (Buffer | null)[] = new Array(limit)
-    for (let i = offset; i < offset + limit; i++) {
-      txs.push(this.txs.get(i))
+    offset = Math.ceil(offset / 128)
+    for (let i = 0; i < limit; i++) {
+      txs[i] = this.txs.get(offset + i * 128)
     }
     return txs
   }

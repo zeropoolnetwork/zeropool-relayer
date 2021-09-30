@@ -3,5 +3,6 @@
   "relayerUrl": "http://0.0.0.0:8000",
   "clientPK": "0x6cbed15c793ce57650b9877cf6fa156fbef513c4e6134f022a85b1ffdd59b2a1",
   "zpAddress": "0xd833215cbcc3f914bd1c9ece3ee7bf8b14f841bb",
-  "tokenAddress": "0x254dffcd3277c0b1660f6d42efbb754edababc2b"
+  "tokenAddress": "0x254dffcd3277c0b1660f6d42efbb754edababc2b",
+  "energyAddress": "0xc89ce4735882c9f0f0fe26686c53074e09b0d550"
 }

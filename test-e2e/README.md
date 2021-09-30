@@ -1,5 +1,7 @@
 # End-to-end ZP test
 
+## How to run
+
 1. Install dependencies
 
 ```bash
