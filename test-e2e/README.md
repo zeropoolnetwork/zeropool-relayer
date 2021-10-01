@@ -8,7 +8,9 @@
 yarn
 ```
 
-2. Run test script
+2. Set RPC_URL in `.env` file to `ws://ganache:8545`
+
+3. Run test script
 
 ```bash
 ./test.sh

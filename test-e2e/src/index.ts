@@ -47,16 +47,12 @@ describe('ZP client', () => {
       expect(account.totalBalance()).eq('5')
       expect(accountOther.totalBalance()).eq('0')
 
-      await sleep(10000)
-
       // Transfer
       mergeTx = await transfer(account, accountOther.generateAddress(), '1')
       await syncAccounts([account, accountOther])
 
       expect(account.totalBalance()).eq('4')
       expect(accountOther.totalBalance()).eq('1')
-
-      await sleep(10000)
 
       // Withdraw from first account
       balanceDiff = await getBalanceDiff(from, async () => {
@@ -70,8 +66,6 @@ describe('ZP client', () => {
       expect(balanceDiff).eq(denominator.mul(toBN(2)).toString())
       expect(account.totalBalance()).eq('2')
       expect(accountOther.totalBalance()).eq('1')
-
-      await sleep(10000)
 
       // Withdraw from second account
       balanceDiff = await getBalanceDiff(from, async () => {

@@ -19,7 +19,8 @@ services:
       args:
         - VERIFIER_IMAGE=lok52/verifier:latest
     volumes:
-      - ./tree.db:/app/tree.db
+      - relayer_tree:/app/tree.db
+      - relayer_txs:/app/txs.db
     env_file: .env
     ports:
       - 8000:8000
@@ -35,3 +36,7 @@ services:
     depends_on:
       - verifier
       - ganache
+
+volumes:
+  relayer_tree:
+  relayer_txs:
