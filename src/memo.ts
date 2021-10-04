@@ -5,10 +5,10 @@ import { TxType } from './utils/helpers';
 
 class Assignable {
   constructor(properties: Object) {
-      Object.keys(properties).map((key) => {
-          // @ts-ignore
-          this[key] = properties[key];
-      });
+    Object.keys(properties).map((key) => {
+      // @ts-ignore
+      this[key] = properties[key];
+    });
   }
 }
 
@@ -26,20 +26,6 @@ export class Memo extends Assignable {
     }
     return notes
   }
-}
-
-function txTypeBorshSchema(txType: TxType) {
-  const fields = [
-    ['fee', [8]]
-  ]
-  if (txType === TxType.WITHDRAWAL) {
-    fields.push(['amount', [8]])
-    fields.push(['address', [20]])
-  }
-  return new Map([[Assignable, {
-    kind: 'struct',
-    fields
-  }]])
 }
 
 function memoBorshSchema(numNotes = 127) {
@@ -68,10 +54,7 @@ export function decodeMemo(data: Buffer, txType: TxType | null) {
     if (txType === TxType.WITHDRAWAL) {
       const amount = reader.readU64()
       const addres = reader.readFixedArray(20)
-      console.log(amount)
-      console.log(addres)
     }
-    console.log(fee)
   }
   const numItems = new DataView(reader.readFixedArray(4).buffer).getUint32(0, true)
   const memo: Memo = deserialize(memoBorshSchema(numItems - 1), Memo, data.slice(reader.offset))

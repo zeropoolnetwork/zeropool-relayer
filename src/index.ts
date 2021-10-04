@@ -1,10 +1,11 @@
 import fs from 'fs'
 import cors from 'cors'
 import express from 'express'
-import winston from 'winston'
-import expressWinston from 'express-winston'
+import { logger } from './services/appLogger'
+import { createLoggerMiddleware } from './services/loggerMiddleware'
 import { Pool } from './pool'
 import { assert } from 'console'
+import { MerkleProof } from 'libzeropool-rs-node'
 
 const PORT = 8000
 const app = express()
@@ -20,12 +21,12 @@ const router = express.Router();
 
 // Used only for testing as proving on client is now slow
 router.post('/proof_tx', (req, res) => {
-  console.log('Proving tx...')
+  logger.debug('Proving tx...')
   const { pub, sec } = JSON.parse(req.body)
   const curIndex = pool.tree.getNextIndex()
   fs.writeFileSync(`object${curIndex}.json`, JSON.stringify([pub, sec], null, 2))
   const proof = pool.getTxProof(pub, sec)
-  console.log('proved')
+  logger.debug('Tx proved')
   res.json(proof)
 })
 
@@ -49,13 +50,23 @@ router.get('/merkle/root/:index?', async (req, res) => {
   res.json(root)
 })
 
-router.get('/merkle/proof/:index(\\d+)', (req, res) => {
-  const noteIndex = parseInt(req.params.index)
-  console.log('MERKLE PROOF INDEX', noteIndex)
-  const proof = pool.getMerkleProof(noteIndex)
+router.get('/merkle/proof', (req, res) => {
+  const deltaIndex = pool.tree.getNextIndex()
   const root = pool.getLocalMerkleRoot()
-  console.log('ROOT', root)
-  res.json(proof)
+
+  const index = req.query.index
+  let proofs: MerkleProof[] = []
+  if (typeof index === 'string') {
+    proofs = [pool.getMerkleProof(parseInt(index))]
+  } else if (Array.isArray(index)) {
+    // @ts-ignore
+    proofs = index.map(i => pool.getMerkleProof(parseInt(i)))
+  }
+  res.json({
+    root,
+    deltaIndex,
+    proofs,
+  })
 })
 
 
@@ -67,16 +78,8 @@ router.post('/transaction', async (req, res) => {
   res.json('OK')
 })
 
-app.use(expressWinston.logger({
-  transports: [
-    new winston.transports.File({ filename: 'zp.log' })
-  ],
-  format: winston.format.combine(
-    winston.format.colorize(),
-    winston.format.json()
-  )
-}))
+app.use(createLoggerMiddleware('zp.log'))
 
 app.use(router)
 
-app.listen(PORT, () => console.log(`Started relayer on port ${PORT}`))
+app.listen(PORT, () => logger.info(`Started relayer on port ${PORT}`))

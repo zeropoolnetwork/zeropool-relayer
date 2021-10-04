@@ -2,27 +2,31 @@
 
 ## How to start locally
 
+1. For development and testing you have to [install](https://rustwasm.github.io/wasm-pack/installer/) `wasm-pack`:
+
+You can optionally install `wasm-opt` to perform some optimizations to the client wasm library
+
 1. Initialize repo
 
 ```bash
 yarn initialize
 ```
 
-2. Copy proving params to local machine
+1. Copy proving params to local machine
 
 ```bash
 ./scripts/copy_params.sh
 ```
 
-3. Add `.env` configuration file
+1. Add `.env` configuration file
 
-4. Start local ganache and deploy contracts
+1. Start local ganache and deploy contracts
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-5. Start relayer
+1. Start relayer
     * Locally
     ```bash
     yarn start:dev

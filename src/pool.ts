@@ -10,6 +10,7 @@ import { decodeMemo } from './memo'
 import { assert } from 'console'
 import { signAndSend } from './tx/signAndSend'
 import { TxType } from './utils/helpers'
+import { logger } from './services/appLogger'
 
 const {
   RPC_URL,
@@ -105,7 +106,7 @@ export class Pool {
     // TODO move to config
     const address = this.web3.eth.accounts.privateKeyToAccount(RELAYER_ADDRESS_PRIVATE_KEY).address
     const nonce = await this.web3.eth.getTransactionCount(address)
-    console.log('nonce', nonce)
+    logger.debug(`nonce ${nonce}`)
     const res = await signAndSend(
       RELAYER_ADDRESS_PRIVATE_KEY,
       data.join(''),
@@ -120,7 +121,7 @@ export class Pool {
       this.web3
     )
     // 16 + 16 + 40
-    console.log('TX HASH', res.transactionHash)
+    logger.debug(`TX HASH' ${res.transactionHash}`)
     let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
     const truncatedMemo = memo_message.slice(txSpecificPrefixLen)
     this.txs.add(parseInt(transferNum), Buffer.from(out_commit.concat(truncatedMemo), 'hex'))
@@ -147,7 +148,7 @@ export class Pool {
   processMemo(memoBlock: Buffer, txType: TxType) {
     // Decode memo block
     const memo = decodeMemo(memoBlock, txType)
-    console.log('Decoded memo block')
+    logger.debug('Decoded memo block')
     const notes = memo.getNotes()
 
     const nextItemIndex = this.tree.getNextIndex()
@@ -160,10 +161,8 @@ export class Pool {
     const proof_free = this.tree.getCommitmentProof(nextCommitIndex)
 
     // Fill commitment subtree
-    console.log('next index before fill', nextItemIndex)
     this.tree.appendHash(memo.accHash)
     this.appendHashes(notes)
-    console.log('next index after fill', this.tree.getNextIndex())
 
     // Get state after processing tx
     const root_after = this.getLocalMerkleRoot()
@@ -172,7 +171,7 @@ export class Pool {
 
     assert(Pool.outCommit(memo.accHash, notes) === leaf, 'WRONG COMMIT')
 
-    console.log('Proving tree')
+    logger.debug('Proving tree')
     const proof = this.getTreeProof({
       root_before,
       root_after,
@@ -182,7 +181,7 @@ export class Pool {
       proof_free,
       prev_leaf,
     })
-    console.log('proved')
+    logger.debug('proved')
 
     return proof
   }
@@ -190,10 +189,10 @@ export class Pool {
   async syncState(fromBlock: number | string = 'earliest') {
     const contractRoot = await this.getContractMerkleRoot(null)
     let localRoot = this.getLocalMerkleRoot()
-    console.log('LATEST CONTRACT ROOT', contractRoot)
-    console.log('LATEST LOCAL ROOT', localRoot)
+    logger.debug(`LATEST CONTRACT ROOT ${contractRoot}`)
+    logger.debug(`LATEST LOCAL ROOT ${localRoot}`)
     if (contractRoot !== localRoot) {
-      console.log('ROOT MISMATCH')
+      logger.debug('ROOT MISMATCH')
 
       // Zero out existing hashes
       const nextIndex = this.tree.getNextIndex()
@@ -218,7 +217,7 @@ export class Pool {
         leafIndex += 128
       })
       localRoot = this.getLocalMerkleRoot()
-      console.log('LATEST LOCAL ROOT AFTER UPDATE', localRoot)
+      logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
     }
   }
 
@@ -246,6 +245,7 @@ export class Pool {
   }
 
   getMerkleProof(noteIndex: number): MerkleProof {
+    logger.debug(`MERKLE PROOF FOR INDEX ${noteIndex}`)
     return this.tree.getProof(noteIndex)
   }
 

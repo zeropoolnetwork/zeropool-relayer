@@ -5,6 +5,7 @@ import TokenAbi from './token-abi.json'
 import { postData, concatArrays, numToHex, fakeTxProof, packSignature } from './utils'
 import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
 
+const expect = chai.expect
 export const web3 = new Web3(rpcUrl)
 export const token = new web3.eth.Contract(TokenAbi as any, tokenAddress)
 export const energyToken = new web3.eth.Contract(TokenAbi as any, energyAddress)
@@ -12,19 +13,21 @@ export const denominator = toBN(1000000000)
 const zero_fee = new Uint8Array(8).fill(0)
 const zero_amount = new Uint8Array(8).fill(0)
 const constants = getConstants()
+const accountToDelta = {}
+
+export async function getTokenBalance(address: string) {
+  return await token.methods.balanceOf(address).call()
+}
+
+export async function getEnergyBalance(address: string) {
+  return await energyToken.methods.balanceOf(address).call()
+}
 
 export async function getBalanceDiff(address: string, f: Function) {
   const balanceBefore = await getTokenBalance(address)
   await f()
   const balanceAfter = await getTokenBalance(address)
   return toBN(balanceAfter).sub(toBN(balanceBefore)).toString()
-}
-
-async function setTxRootFromDeltaIndex(mergeTx: any) {
-  const rootIndex = mergeTx.parsed_delta.index
-  const root: string = await fetch(`${relayerUrl}/merkle/root/${rootIndex}`).then(r => r.json())
-  mergeTx.public.root = root
-  return mergeTx
 }
 
 export async function syncAccounts(accounts: UserAccount[]) {
@@ -38,37 +41,53 @@ export async function syncNotesAndAccount(account: UserAccount, numTxs = 20n, of
   const txs = await fetch(
     `${relayerUrl}/transactions/${numTxs.toString()}/${offset.toString()}`
   ).then(r => r.json())
+
+  // Extract user's accounts and notes from memo blocks
+  const indices = []
   for (let txNum = 0; txNum <= txs.length; txNum++) {
     const tx = txs[txNum]
-    if (tx) {
-      const numLeafs = BigInt(constants.OUT + 1)
-      const accountOffset = BigInt(offset + BigInt(txNum) * numLeafs)
+    if (!tx) continue
 
-      const buf = Uint8Array.from(tx.data.slice(32))
-      const notes = account.decryptNotes(buf)
+    // First 32 bytes is nullifier
+    const buf = Uint8Array.from(tx.data.slice(32))
 
-      const pair = account.decryptPair(buf)
-      if (pair) {
-        console.log('Found account at', accountOffset, pair.account)
-        account.addAccount(accountOffset, pair.account)
-        await syncMerkle(account, accountOffset)
-      }
+    const numLeafs = BigInt(constants.OUT + 1)
+    const accountOffset = BigInt(offset + BigInt(txNum) * numLeafs)
 
-      for (let n of notes) {
-        if (!n) return
-        const noteIndex = accountOffset + 1n + BigInt(n.index)
-        console.log('Found note at', noteIndex.toString(), n)
-        account.addReceivedNote(noteIndex, n.note)
-        await syncMerkle(account, noteIndex)
-      }
+    const pair = account.decryptPair(buf)
+    if (pair) {
+      account.addAccount(accountOffset, pair.account)
+      indices.push(accountOffset.toString())
+    }
+
+    const notes = account.decryptNotes(buf)
+
+    for (const n of notes) {
+      if (!n) continue
+      const noteIndex = accountOffset + 1n + BigInt(n.index)
+      account.addReceivedNote(noteIndex, n.note)
+      indices.push(noteIndex.toString())
     }
   }
-  console.log('ROOT', account.getRoot())
+
+  const { proofs, root, deltaIndex } = await getMerkleProofs(indices)
+  expect(proofs.length).eq(indices.length)
+
+  for (let i = 0; i < proofs.length; i++) {
+    const proof = proofs[i]
+    const index = indices[i]
+    if (proof) account.addMerkleProof(BigInt(index), proof.sibling)
+  }
+  account.addMerkleSubtreeRoot(constants.HEIGHT, 0n, root)
+
+  // @ts-ignore
+  accountToDelta[account] = deltaIndex
 }
 
-async function syncMerkle(account: UserAccount, index: bigint) {
-  const merkleProof: any = await fetch(`${relayerUrl}/merkle/proof/${index}`).then(r => r.json())
-  account.addMerkleProof(index, merkleProof.sibling)
+async function getMerkleProofs(indeces: (string | number)[]) {
+  const query = indeces.reduce((prev, cur) => `${prev}&index=${cur}`, '')
+  const proofs = await fetch(`${relayerUrl}/merkle/proof?${query}`).then(r => r.json())
+  return proofs
 }
 
 async function proofAndSend(mergeTx: any, fake: boolean, txType: string, depositSignature: string | null) {
@@ -110,14 +129,6 @@ async function proofAndSend(mergeTx: any, fake: boolean, txType: string, deposit
     })
 }
 
-export async function getTokenBalance(address: string) {
-  return await token.methods.balanceOf(address).call()
-}
-
-export async function getEnergyBalance(address: string) {
-  return await energyToken.methods.balanceOf(address).call()
-}
-
 export async function createAccount(sk: number[]) {
   const state = await UserState.init("any user identifier")
   const account = new UserAccount(Uint8Array.from(sk), state)
@@ -125,9 +136,9 @@ export async function createAccount(sk: number[]) {
 }
 
 async function createTx(account: UserAccount, type: string, value: any, data: Uint8Array) {
-  const index: string = await fetch(`${relayerUrl}/delta_index`).then(r => r.json())
-  let mergeTx = await account.createTx(type, value, data, BigInt(index))
-  mergeTx = await setTxRootFromDeltaIndex(mergeTx)
+  // @ts-ignore
+  const index = accountToDelta[account]
+  const mergeTx = await account.createTx(type, value, data, BigInt(index))
   return mergeTx
 }
 

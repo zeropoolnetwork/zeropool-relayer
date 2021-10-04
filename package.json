@@ -14,7 +14,6 @@
     "dotenv": "^10.0.0",
     "express": "^4.17.1",
     "libzeropool-rs-node": "link:./libzeropool-rs/libzeropool-rs-node",
-    "libzeropool-rs-wasm-node": "link:./libzeropool-rs/libzeropool-rs-wasm/nodejs",
     "node-fetch": "^2.6.1",
     "promise-retry": "^2.0.1",
     "ts-node": "^10.1.0",
