@@ -19,10 +19,9 @@ describe('ZP client', () => {
     let mergeTx
     let balanceDiff
     let energyBalance
+    const from = '0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0'
+    const minter = '0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1'
     it('can deposit-transfer-withdraw', async () => {
-      const minter = '0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1'
-      const from = '0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0'
-
       const account = await createAccount([1, 2, 3])
       const accountOther = await createAccount([4, 5, 6])
 
@@ -81,8 +80,8 @@ describe('ZP client', () => {
       expect(account.totalBalance()).eq('2')
       expect(accountOther.totalBalance()).eq('0')
 
-    });
-  });
-});
+    })
+  })
+})
 
 mocha.run()

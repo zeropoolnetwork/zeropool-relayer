@@ -137,7 +137,7 @@ export async function createAccount(sk: number[]) {
 
 async function createTx(account: UserAccount, type: string, value: any, data: Uint8Array) {
   // @ts-ignore
-  const index = accountToDelta[account]
+  const index = accountToDelta[account] || 0
   const mergeTx = await account.createTx(type, value, data, BigInt(index))
   return mergeTx
 }

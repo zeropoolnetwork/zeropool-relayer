@@ -9,7 +9,7 @@ import { Params, TreePub, TreeSec, SnarkProof, Proof, MerkleTree, TxStorage, Hel
 import { decodeMemo } from './memo'
 import { assert } from 'console'
 import { signAndSend } from './tx/signAndSend'
-import { TxType } from './utils/helpers'
+import { TxType, numToHex, truncateHexPrefix } from './utils/helpers'
 import { logger } from './services/appLogger'
 
 const {
@@ -35,53 +35,30 @@ export class Pool {
     this.syncState()
   }
 
-  getTxProof(pub: TransferPub, sec: TransferSec) {
-    const params = Params.fromFile('./transfer_params.bin')
-    return Proof.tx(params, pub, sec)
-  }
-
-  truncateHexPrefix(data: string) {
-    if (data.startsWith('0x')) {
-      data = data.slice(2)
-    }
-    return data
-  }
-
-  numToHex(n: string, pad = 64) {
-    let num = toBN(n)
-    if (num.isNeg()) {
-      let a = toBN(2).pow(toBN(pad * 4))
-      num = a.sub(num.neg())
-    }
-    const hex = this.truncateHexPrefix(this.web3.utils.numberToHex(num))
-    assert(hex.length <= pad, 'hex size overflow')
-    return this.web3.utils.padLeft(hex, pad)
-  }
-
   async transact(txProof: Proof, treeProof: Proof, memo: Buffer, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
     const transferNum: string = await this.PoolInstance.methods.transfer_num().call()
 
     // Construct tx calldata
     const selector: string = this.PoolInstance.methods.transact().encodeABI()
 
-    const nullifier = this.numToHex(txProof.inputs[1])
-    const out_commit = this.numToHex(treeProof.inputs[2])
+    const nullifier = numToHex(txProof.inputs[1])
+    const out_commit = numToHex(treeProof.inputs[2])
 
     assert(treeProof.inputs[2] == txProof.inputs[2], 'commmitment error')
 
     const delta = Helpers.parseDelta(txProof.inputs[3])
-    const transfer_index = this.numToHex(delta.index, 12)
-    const enery_amount = this.numToHex(delta.e, 16)
-    const token_amount = this.numToHex(delta.v, 16)
+    const transfer_index = numToHex(delta.index, 12)
+    const enery_amount = numToHex(delta.e, 16)
+    const token_amount = numToHex(delta.v, 16)
 
     const transact_proof = this.flattenProof(txProof.proof)
 
-    const root_after = this.numToHex(treeProof.inputs[1])
+    const root_after = numToHex(treeProof.inputs[1])
     const tree_proof = this.flattenProof(treeProof.proof)
 
     const tx_type = txType
     const memo_message = memo.toString('hex')
-    const memo_size = this.numToHex((memo_message.length / 2).toString(), 4)
+    const memo_size = numToHex((memo_message.length / 2).toString(), 4)
 
     const data = [
       selector,
@@ -99,7 +76,7 @@ export class Pool {
     ]
 
     if (depositSignature) {
-      depositSignature = this.truncateHexPrefix(depositSignature)
+      depositSignature = truncateHexPrefix(depositSignature)
       data.push(depositSignature)
     }
 
@@ -125,24 +102,6 @@ export class Pool {
     let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
     const truncatedMemo = memo_message.slice(txSpecificPrefixLen)
     this.txs.add(parseInt(transferNum), Buffer.from(out_commit.concat(truncatedMemo), 'hex'))
-  }
-
-  getDbTx(i: number): [string, string] | null {
-    const buf = this.txs.get(i)
-    if (!buf) return null
-    const data = buf.toString()
-    const out_commit = data.slice(0, 64)
-    const memo = data.slice(64)
-    return [out_commit, memo]
-  }
-
-  appendHashes(hashes: Buffer[]) {
-    hashes.forEach(h => this.tree.appendHash(h))
-  }
-
-  static outCommit(accHash: Buffer, notes: Buffer[]) {
-    const out_hashes = [accHash].concat(notes)
-    return Helpers.outCommitmentHash(out_hashes)
   }
 
   processMemo(memoBlock: Buffer, txType: TxType) {
@@ -186,6 +145,24 @@ export class Pool {
     return proof
   }
 
+  static outCommit(accHash: Buffer, notes: Buffer[]) {
+    const out_hashes = [accHash].concat(notes)
+    return Helpers.outCommitmentHash(out_hashes)
+  }
+
+  appendHashes(hashes: Buffer[]) {
+    hashes.forEach(h => this.tree.appendHash(h))
+  }
+
+  getDbTx(i: number): [string, string] | null {
+    const buf = this.txs.get(i)
+    if (!buf) return null
+    const data = buf.toString()
+    const out_commit = data.slice(0, 64)
+    const memo = data.slice(64)
+    return [out_commit, memo]
+  }
+
   async syncState(fromBlock: number | string = 'earliest') {
     const contractRoot = await this.getContractMerkleRoot(null)
     let localRoot = this.getLocalMerkleRoot()
@@ -221,6 +198,11 @@ export class Pool {
     }
   }
 
+  getTxProof(pub: TransferPub, sec: TransferSec) {
+    const params = Params.fromFile('./transfer_params.bin')
+    return Proof.tx(params, pub, sec)
+  }
+
   getTreeProof(pub: TreePub, sec: TreeSec): Proof {
     return Proof.tree(this.treeParams, pub, sec)
   }
@@ -235,7 +217,7 @@ export class Pool {
 
   private flattenProof(p: SnarkProof): string {
     return [p.a, p.b.flat(), p.c].flat().map(n => {
-      const hex = this.numToHex(n)
+      const hex = numToHex(n)
       return hex
     }).join('')
   }

@@ -69,13 +69,22 @@ router.get('/merkle/proof', (req, res) => {
   })
 })
 
-
 router.post('/transaction', async (req, res) => {
   const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
   const buf = Buffer.from(memo, 'hex')
   const treeProof = pool.processMemo(buf, txType)
   await pool.transact(proof, treeProof, buf, txType, depositSignature)
   res.json('OK')
+})
+
+router.get('/info', (req, res) => {
+  const deltaIndex = pool.tree.getNextIndex()
+  const root = pool.getLocalMerkleRoot()
+
+  res.json({
+    root,
+    deltaIndex,
+  })
 })
 
 app.use(createLoggerMiddleware('zp.log'))
