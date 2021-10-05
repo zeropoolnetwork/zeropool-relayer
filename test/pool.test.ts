@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { decodeMemo } from '../src/memo'
+import { decodeMemo } from '../src/utils/memo'
 import { Pool } from '../src/pool'
 import { MerkleTree, Constants } from 'libzeropool-rs-node'
 import depositMemo from './depositMemo.json'
@@ -14,13 +14,12 @@ describe('Pool', () => {
 
     const buf = Buffer.from(depositMemo, 'hex')
     const memo = decodeMemo(buf, TxType.DEPOSIT)
-    const notes = memo.getNotes()
 
     tree.appendHash(memo.accHash)
-    notes.forEach(n => tree.appendHash(n))
+    memo.noteHashes.forEach(n => tree.appendHash(n))
 
     // Commit calculated from raw hashes
-    const out_commit_calc = Pool.outCommit(memo.accHash, notes)
+    const out_commit_calc = Pool.outCommit([memo.accHash].concat(memo.noteHashes))
     // Commit as a root of subtree with inserted hashes
     const out_commit_node = tree.getNode(Constants.OUTLOG, 0)
 

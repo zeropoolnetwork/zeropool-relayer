@@ -70,10 +70,10 @@ router.get('/merkle/proof', (req, res) => {
 })
 
 router.post('/transaction', async (req, res) => {
-  const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
-  const buf = Buffer.from(memo, 'hex')
-  const treeProof = pool.processMemo(buf, txType)
-  await pool.transact(proof, treeProof, buf, txType, depositSignature)
+  const { proof, memo: rawMemo, txType, depositSignature } = JSON.parse(req.body)
+  const buf = Buffer.from(rawMemo, 'hex')
+  const { proof: treeProof, memo } = pool.processMemo(buf, txType)
+  await pool.transact(proof, treeProof, memo, txType, depositSignature)
   res.json('OK')
 })
 

@@ -1,7 +1,7 @@
 import fs from 'fs'
 
 import { deserialize, BinaryReader } from 'borsh'
-import { TxType } from './utils/helpers';
+import { TxType } from './helpers';
 
 class Assignable {
   constructor(properties: Object) {
@@ -13,26 +13,22 @@ class Assignable {
 }
 
 export class Memo extends Assignable {
+  rawBuf!: Buffer
   numItems!: number
   accHash!: Buffer
-  noteHashes!: Buffer
+  noteHashes!: Buffer[]
+  rawNoteHashes!: Buffer
   a_p_x!: number
-
-  getNotes(): Buffer[] {
-    const notes = []
-    for (let i = 0; i < this.numItems - 1; i++) {
-      const note_hash = Buffer.from(this.noteHashes.slice(i * 32, (i + 1) * 32))
-      notes.push(note_hash)
-    }
-    return notes
-  }
+  fee = null
+  amount = null
+  address = null
 }
 
 function memoBorshSchema(numNotes = 127) {
   const POLY_1305_TAG_SIZE = 16
   const fields = [
     ['accHash', [32]],
-    ['noteHashes', [numNotes * 32]],
+    ['rawNoteHashes', [numNotes * 32]],
     ['a_p_x', 'u256'],
     ['sharedSecretCiphertext', [(numNotes + 1) * 32 + POLY_1305_TAG_SIZE]],
     ['accountCiphertext', [64 + POLY_1305_TAG_SIZE]],
@@ -47,6 +43,15 @@ function memoBorshSchema(numNotes = 127) {
   }]])
 }
 
+function splitHashes(rawHashes: Buffer, num: number): Buffer[] {
+  const notes = []
+  for (let i = 0; i < num; i++) {
+    const note_hash = Buffer.from(rawHashes.slice(i * 32, (i + 1) * 32))
+    notes.push(note_hash)
+  }
+  return notes
+}
+
 export function decodeMemo(data: Buffer, txType: TxType | null) {
   const reader = new BinaryReader(data)
   if (txType) {
@@ -59,6 +64,8 @@ export function decodeMemo(data: Buffer, txType: TxType | null) {
   const numItems = new DataView(reader.readFixedArray(4).buffer).getUint32(0, true)
   const memo: Memo = deserialize(memoBorshSchema(numItems - 1), Memo, data.slice(reader.offset))
   memo.numItems = numItems
+  memo.noteHashes = splitHashes(memo.rawNoteHashes, numItems - 1)
+  memo.rawBuf = data
   fs.writeFileSync('./data.json', JSON.stringify(memo, null, 2), 'utf-8');
   return memo
 }

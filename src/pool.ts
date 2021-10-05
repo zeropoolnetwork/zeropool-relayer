@@ -6,9 +6,9 @@ import { Contract } from 'web3-eth-contract'
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
 import { Params, TreePub, TreeSec, SnarkProof, Proof, MerkleTree, TxStorage, Helpers, MerkleProof, TransferPub, TransferSec, Constants } from 'libzeropool-rs-node'
-import { decodeMemo } from './memo'
 import { assert } from 'console'
 import { signAndSend } from './tx/signAndSend'
+import { decodeMemo, Memo } from './utils/memo'
 import { TxType, numToHex, truncateHexPrefix } from './utils/helpers'
 import { logger } from './services/appLogger'
 
@@ -35,7 +35,7 @@ export class Pool {
     this.syncState()
   }
 
-  async transact(txProof: Proof, treeProof: Proof, memo: Buffer, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
+  async transact(txProof: Proof, treeProof: Proof, memo: Memo, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
     const transferNum: string = await this.PoolInstance.methods.transfer_num().call()
 
     // Construct tx calldata
@@ -57,7 +57,7 @@ export class Pool {
     const tree_proof = this.flattenProof(treeProof.proof)
 
     const tx_type = txType
-    const memo_message = memo.toString('hex')
+    const memo_message = memo.rawBuf.toString('hex')
     const memo_size = numToHex((memo_message.length / 2).toString(), 4)
 
     const data = [
@@ -99,36 +99,43 @@ export class Pool {
     )
     // 16 + 16 + 40
     logger.debug(`TX HASH' ${res.transactionHash}`)
+
+    logger.debug('UPDATING TREE')
+    this.appendHashes([memo.accHash].concat(memo.noteHashes))
+
     let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
     const truncatedMemo = memo_message.slice(txSpecificPrefixLen)
     this.txs.add(parseInt(transferNum), Buffer.from(out_commit.concat(truncatedMemo), 'hex'))
   }
 
-  processMemo(memoBlock: Buffer, txType: TxType) {
+  processMemo(memoBlock: Buffer, txType: TxType): { memo: Memo, proof: Proof } {
     // Decode memo block
     const memo = decodeMemo(memoBlock, txType)
     logger.debug('Decoded memo block')
-    const notes = memo.getNotes()
 
     const nextItemIndex = this.tree.getNextIndex()
     const nextCommitIndex = Math.floor(nextItemIndex / 128)
     const prevCommitIndex = nextCommitIndex - 1
 
     // Get state before processing tx
+    const hashes = [memo.accHash].concat(memo.noteHashes)
+    const virtualNodes = hashes.map((h, i) => {
+      return [[0, nextItemIndex + i], Helpers.numToStr(h)]
+    })
     const root_before = this.getLocalMerkleRoot()
+    const root_after = this.tree.getVirtualNode(
+      Constants.HEIGHT,
+      0,
+      virtualNodes,
+      nextItemIndex,
+      nextItemIndex + hashes.length
+    )
+
     const proof_filled = this.tree.getCommitmentProof(prevCommitIndex)
     const proof_free = this.tree.getCommitmentProof(nextCommitIndex)
 
-    // Fill commitment subtree
-    this.tree.appendHash(memo.accHash)
-    this.appendHashes(notes)
-
-    // Get state after processing tx
-    const root_after = this.getLocalMerkleRoot()
-    const leaf = this.tree.getNode(Constants.OUTLOG, nextCommitIndex)
+    const leaf = Pool.outCommit(hashes)
     const prev_leaf = this.tree.getNode(Constants.OUTLOG, prevCommitIndex)
-
-    assert(Pool.outCommit(memo.accHash, notes) === leaf, 'WRONG COMMIT')
 
     logger.debug('Proving tree')
     const proof = this.getTreeProof({
@@ -142,12 +149,11 @@ export class Pool {
     })
     logger.debug('proved')
 
-    return proof
+    return { proof, memo }
   }
 
-  static outCommit(accHash: Buffer, notes: Buffer[]) {
-    const out_hashes = [accHash].concat(notes)
-    return Helpers.outCommitmentHash(out_hashes)
+  static outCommit(hashes: Buffer[]) {
+    return Helpers.outCommitmentHash(hashes)
   }
 
   appendHashes(hashes: Buffer[]) {
@@ -185,7 +191,7 @@ export class Pool {
         if (!memoString) return
         const buf = Buffer.from(memoString.slice(2), 'hex')
         const memo = decodeMemo(buf, null)
-        const notes = memo.getNotes()
+        const notes = memo.noteHashes
 
         this.tree.addHash(leafIndex, memo.accHash)
         for (let i = 0; i < 127; i++) {
