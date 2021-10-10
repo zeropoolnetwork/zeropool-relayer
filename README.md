@@ -6,27 +6,27 @@
 
 You can optionally install `wasm-opt` to perform some optimizations to the client wasm library
 
-1. Initialize repo
+2. Initialize repo
 
 ```bash
 yarn initialize
 ```
 
-1. Copy proving params to local machine
+3. Copy proving params to local machine
 
 ```bash
 ./scripts/copy_params.sh
 ```
 
-1. Add `.env` configuration file
+4. Add `.env` configuration file
 
-1. Start local ganache and deploy contracts
+5. Start local ganache and deploy contracts
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-1. Start relayer
+6. Start relayer
     * Locally
     ```bash
     yarn start:dev
@@ -45,3 +45,54 @@ yarn test
 ## Local configuration
 
 * You cat change env parameters `MOCK_TREE_VERIFIER` and `MOCK_TX_VERIFIER` in Dockerfile (also change deploy script to save params locally) to enable/disable mock verifiers
+
+
+## API
+
+`/transaction` - submit a transaction to relayer
+
+Recieved:
+```json
+{
+    proof, // TX proof
+    memo, // memo block
+    txType, // 0 - Deposit, 1 - Transfer, 2 - Withdraw
+    depositSignature // Optional nullifier signature for Depost
+}
+```
+
+`/proof_tx` - proove tx. Use only for tests. Tx proof must be calculated on client side but for now it is slow
+
+Recieved:
+```json
+{
+    pub, // public inputs for tx circuit
+    sec, // secret inputs for tx circuit
+}
+```
+
+Returns:
+```json
+{
+    inputs: Array<string>;
+    proof: SnarkProof;
+}
+```
+
+`/transactions/:limit/:offset` - get transactions at indecies `[offset, offset+128 .. offset+limit*128]` and for each return string `out_commit+memo`
+
+Returns:
+```json
+(Buffer|null)[]
+```
+
+`/merkle/proof?[index]` - recieves list of indecies as get params
+
+Returns
+```json
+{
+    root, // indicates state of the tree for returned proofs
+    deltaIndex, // this index should be used for building tx proof
+    proofs, // merkle proofs
+}
+```

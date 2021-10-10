@@ -1,7 +1,8 @@
 import fs from 'fs'
 
 import { deserialize, BinaryReader } from 'borsh'
-import { TxType } from './helpers';
+import { TxType } from './helpers'
+import { logger } from '../services/appLogger'
 
 class Assignable {
   constructor(properties: Object) {
@@ -53,6 +54,7 @@ function splitHashes(rawHashes: Buffer, num: number): Buffer[] {
 }
 
 export function decodeMemo(data: Buffer, txType: TxType | null) {
+  logger.debug('Decoding memo...')
   const reader = new BinaryReader(data)
   if (txType) {
     const fee = reader.readU64()

@@ -1,5 +1,6 @@
 import { numberToHex, padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
+import { SnarkProof } from 'libzeropool-rs-node'
 
 export enum TxType {
   DEPOSIT = '00',
@@ -25,4 +26,11 @@ export function numToHex(n: string, pad = 64) {
     logger.error(`hex size overflow: ${hex}; pad: ${pad}`)
   }
   return padLeft(hex, pad)
+}
+
+export function flattenProof(p: SnarkProof): string {
+  return [p.a, p.b.flat(), p.c].flat().map(n => {
+    const hex = numToHex(n)
+    return hex
+  }).join('')
 }

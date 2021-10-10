@@ -16,18 +16,18 @@ const constants = getConstants()
 const accountToDelta = {}
 
 export async function getTokenBalance(address: string) {
-  return await token.methods.balanceOf(address).call()
+  return toBN(await token.methods.balanceOf(address).call())
 }
 
 export async function getEnergyBalance(address: string) {
-  return await energyToken.methods.balanceOf(address).call()
+  return toBN(await energyToken.methods.balanceOf(address).call())
 }
 
 export async function getBalanceDiff(address: string, f: Function) {
   const balanceBefore = await getTokenBalance(address)
   await f()
   const balanceAfter = await getTokenBalance(address)
-  return toBN(balanceAfter).sub(toBN(balanceBefore)).toString()
+  return balanceAfter.sub(balanceBefore)
 }
 
 export async function syncAccounts(accounts: UserAccount[]) {

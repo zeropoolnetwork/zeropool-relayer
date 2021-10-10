@@ -3,14 +3,17 @@ import cors from 'cors'
 import express from 'express'
 import { logger } from './services/appLogger'
 import { createLoggerMiddleware } from './services/loggerMiddleware'
-import { Pool } from './pool'
+import { pool } from './pool'
 import { assert } from 'console'
 import { MerkleProof } from 'libzeropool-rs-node'
+import { createTxWorker } from './worker'
+
+
+const worker = createTxWorker()
+logger.info(`Worker ${worker.name}`)
 
 const PORT = 8000
 const app = express()
-
-const pool = new Pool()
 
 app.use(cors())
 app.use(express.urlencoded({ extended: true }))
@@ -70,10 +73,8 @@ router.get('/merkle/proof', (req, res) => {
 })
 
 router.post('/transaction', async (req, res) => {
-  const { proof, memo: rawMemo, txType, depositSignature } = JSON.parse(req.body)
-  const buf = Buffer.from(rawMemo, 'hex')
-  const { proof: treeProof, memo } = pool.processMemo(buf, txType)
-  await pool.transact(proof, treeProof, memo, txType, depositSignature)
+  const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
+  await pool.transact(proof, memo, txType, depositSignature)
   res.json('OK')
 })
 

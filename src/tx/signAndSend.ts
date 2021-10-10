@@ -13,7 +13,7 @@ export async function signAndSend(
   to: string,
   chainId: number,
   web3: Web3
-): Promise<TransactionReceipt> {
+): Promise<string> {
   const serializedTx = await web3.eth.accounts.signTransaction(
     {
       nonce,
@@ -30,9 +30,7 @@ export async function signAndSend(
   return new Promise((res, rej) =>
     web3.eth
       .sendSignedTransaction(serializedTx.rawTransaction as string)
-      .on('receipt', (r) => {
-        res(r)
-      })
+      .on('transactionHash', res)
       .once('error', rej)
   )
 }

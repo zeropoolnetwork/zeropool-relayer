@@ -1,162 +1,108 @@
-import dotenv from 'dotenv'
-dotenv.config()
-
-import Web3 from 'web3'
-import { Contract } from 'web3-eth-contract'
+import './env'
 import PoolAbi from './abi/pool-abi.json'
-import { AbiItem, toBN } from 'web3-utils'
-import { Params, TreePub, TreeSec, SnarkProof, Proof, MerkleTree, TxStorage, Helpers, MerkleProof, TransferPub, TransferSec, Constants } from 'libzeropool-rs-node'
-import { assert } from 'console'
-import { signAndSend } from './tx/signAndSend'
-import { decodeMemo, Memo } from './utils/memo'
-import { TxType, numToHex, truncateHexPrefix } from './utils/helpers'
+import { AbiItem } from 'web3-utils'
+import { Contract } from 'web3-eth-contract'
+import { config } from './config/config'
+import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
+import { redis } from './services/redisClient'
+import { TxType } from './utils/helpers'
+import { decodeMemo } from './utils/memo'
+import { TX_QUEUE_NAME } from './utils/constants'
+import { Queue } from 'bullmq'
+import { Params, TreePub, TreeSec, Proof, MerkleTree, TxStorage, Helpers, MerkleProof, TransferPub, TransferSec, Constants } from 'libzeropool-rs-node'
 
-const {
-  RPC_URL,
-  POOL_ADDRESS,
-  RELAYER_ADDRESS_PRIVATE_KEY,
-} = process.env as Record<PropertyKey, string>
+export interface TxPayload {
+  to: string
+  amount: string
+  gas: string | number
+  txProof: Proof
+  txType: TxType
+  rawMemo: string
+  depositSignature: string | null
+}
 
-export class Pool {
-  private PoolInstance: Contract
+class Pool {
+  public PoolInstance: Contract
   private treeParams: Params
   public tree: MerkleTree
-  private txs: TxStorage
-  private web3: Web3
+  public txs: TxStorage
+  private txQueue: Queue<TxPayload>
 
   constructor() {
-    this.web3 = new Web3(RPC_URL)
-    this.PoolInstance = new this.web3.eth.Contract(PoolAbi as AbiItem[], POOL_ADDRESS)
+    this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
     this.treeParams = Params.fromFile('./tree_params.bin')
     this.tree = new MerkleTree('./tree.db')
     this.txs = new TxStorage('./txs.db')
+    this.txQueue = new Queue(TX_QUEUE_NAME, {
+      connection: redis
+    })
 
     this.syncState()
   }
 
-  async transact(txProof: Proof, treeProof: Proof, memo: Memo, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
-    const transferNum: string = await this.PoolInstance.methods.transfer_num().call()
-
-    // Construct tx calldata
-    const selector: string = this.PoolInstance.methods.transact().encodeABI()
-
-    const nullifier = numToHex(txProof.inputs[1])
-    const out_commit = numToHex(treeProof.inputs[2])
-
-    assert(treeProof.inputs[2] == txProof.inputs[2], 'commmitment error')
-
-    const delta = Helpers.parseDelta(txProof.inputs[3])
-    const transfer_index = numToHex(delta.index, 12)
-    const enery_amount = numToHex(delta.e, 16)
-    const token_amount = numToHex(delta.v, 16)
-
-    const transact_proof = this.flattenProof(txProof.proof)
-
-    const root_after = numToHex(treeProof.inputs[1])
-    const tree_proof = this.flattenProof(treeProof.proof)
-
-    const tx_type = txType
-    const memo_message = memo.rawBuf.toString('hex')
-    const memo_size = numToHex((memo_message.length / 2).toString(), 4)
-
-    const data = [
-      selector,
-      nullifier,
-      out_commit,
-      transfer_index,
-      enery_amount,
-      token_amount,
-      transact_proof,
-      root_after,
-      tree_proof,
-      tx_type,
-      memo_size,
-      memo_message
-    ]
-
-    if (depositSignature) {
-      depositSignature = truncateHexPrefix(depositSignature)
-      data.push(depositSignature)
-    }
-
-    // TODO move to config
-    const address = this.web3.eth.accounts.privateKeyToAccount(RELAYER_ADDRESS_PRIVATE_KEY).address
-    const nonce = await this.web3.eth.getTransactionCount(address)
-    logger.debug(`nonce ${nonce}`)
-    const res = await signAndSend(
-      RELAYER_ADDRESS_PRIVATE_KEY,
-      data.join(''),
-      nonce,
-      // TODO gasPrice
-      '',
-      toBN(0),
-      // TODO gas
-      5000000,
-      this.PoolInstance.options.address,
-      await this.web3.eth.getChainId(),
-      this.web3
-    )
-    // 16 + 16 + 40
-    logger.debug(`TX HASH' ${res.transactionHash}`)
-
-    logger.debug('UPDATING TREE')
-    this.appendHashes([memo.accHash].concat(memo.noteHashes))
-
-    let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
-    const truncatedMemo = memo_message.slice(txSpecificPrefixLen)
-    this.txs.add(parseInt(transferNum), Buffer.from(out_commit.concat(truncatedMemo), 'hex'))
+  async transact(txProof: Proof, rawMemo: string, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
+    logger.debug('Adding tx job to queue')
+    // TODO maybe store memo in redis as a path to a file
+    const job = await this.txQueue.add('test-tx', {
+      to: config.poolAddress,
+      amount: '0',
+      gas: 5000000,
+      txProof,
+      txType,
+      rawMemo,
+      depositSignature
+    })
+    logger.debug(`Added job: ${job.id}`)
   }
 
-  processMemo(memoBlock: Buffer, txType: TxType): { memo: Memo, proof: Proof } {
-    // Decode memo block
-    const memo = decodeMemo(memoBlock, txType)
-    logger.debug('Decoded memo block')
-
-    const nextItemIndex = this.tree.getNextIndex()
-    const nextCommitIndex = Math.floor(nextItemIndex / 128)
+  getVirtualTreeProof(hashes: Buffer[]) {
+    logger.debug(`Building virtual tree proof...`)
+    const outCommit = Helpers.outCommitmentHash(hashes)
+    const nextCommitIndex = Math.floor(this.tree.getNextIndex() / 128)
     const prevCommitIndex = nextCommitIndex - 1
 
-    // Get state before processing tx
-    const hashes = [memo.accHash].concat(memo.noteHashes)
-    const virtualNodes = hashes.map((h, i) => {
-      return [[0, nextItemIndex + i], Helpers.numToStr(h)]
-    })
-    const root_before = this.getLocalMerkleRoot()
+    const transferNum = nextCommitIndex * 128
+    const root_before = this.tree.getRoot()
     const root_after = this.tree.getVirtualNode(
       Constants.HEIGHT,
       0,
-      virtualNodes,
-      nextItemIndex,
-      nextItemIndex + hashes.length
+      [[[Constants.OUTLOG, nextCommitIndex], outCommit]],
+      transferNum,
+      transferNum + 128
     )
 
     const proof_filled = this.tree.getCommitmentProof(prevCommitIndex)
     const proof_free = this.tree.getCommitmentProof(nextCommitIndex)
 
-    const leaf = Pool.outCommit(hashes)
+    const leaf = outCommit
     const prev_leaf = this.tree.getNode(Constants.OUTLOG, prevCommitIndex)
 
-    logger.debug('Proving tree')
-    const proof = this.getTreeProof({
-      root_before,
-      root_after,
-      leaf,
-    }, {
-      proof_filled,
-      proof_free,
-      prev_leaf,
-    })
+    logger.debug(`Virtual root ${root_after}; Commit ${outCommit}; Index ${nextCommitIndex}`)
+
+    logger.debug('Proving tree...')
+    const proof = Proof.tree(
+      this.treeParams,
+      {
+        root_before,
+        root_after,
+        leaf,
+      },
+      {
+        proof_filled,
+        proof_free,
+        prev_leaf,
+      }
+    )
     logger.debug('proved')
 
-    return { proof, memo }
+    return {
+      proof,
+      transferNum,
+    }
   }
 
-  static outCommit(hashes: Buffer[]) {
-    return Helpers.outCommitmentHash(hashes)
-  }
-
-  appendHashes(hashes: Buffer[]) {
+  async appendHashes(hashes: Buffer[]) {
     hashes.forEach(h => this.tree.appendHash(h))
   }
 
@@ -221,19 +167,12 @@ export class Pool {
     return root.toString()
   }
 
-  private flattenProof(p: SnarkProof): string {
-    return [p.a, p.b.flat(), p.c].flat().map(n => {
-      const hex = numToHex(n)
-      return hex
-    }).join('')
-  }
-
   getLocalMerkleRoot(): string {
     return this.tree.getRoot()
   }
 
   getMerkleProof(noteIndex: number): MerkleProof {
-    logger.debug(`MERKLE PROOF FOR INDEX ${noteIndex}`)
+    logger.debug(`Merkle proof for index ${noteIndex}`)
     return this.tree.getProof(noteIndex)
   }
 
@@ -246,3 +185,5 @@ export class Pool {
     return txs
   }
 }
+
+export const pool = new Pool()
