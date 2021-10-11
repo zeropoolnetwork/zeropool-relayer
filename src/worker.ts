@@ -1,6 +1,6 @@
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
-import { Worker } from 'bullmq'
+import { Job, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
@@ -112,7 +112,7 @@ function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: str
   return data.join('')
 }
 
-async function processTx(payload: TxPayload, jobId: string | undefined) {
+async function processTx(job: Job<TxPayload>) {
   const {
     to,
     amount,
@@ -121,7 +121,17 @@ async function processTx(payload: TxPayload, jobId: string | undefined) {
     txType,
     rawMemo,
     depositSignature
-  } = payload
+  } = job.data
+  const jobId = job.id
+
+  const logPrefix = `Job ${jobId}:`
+
+  const verifyRes = pool.verifyProof(txProof.proof, txProof.inputs)
+
+  if (!verifyRes) {
+    logger.error(`${logPrefix} proof verification failed`)
+    throw new Error('Incorrect transfer proof')
+  }
 
   const memo = decodeMemo(Buffer.from(rawMemo, 'hex'), txType)
 
@@ -138,7 +148,7 @@ async function processTx(payload: TxPayload, jobId: string | undefined) {
   )
 
   const nonce = await readNonce()
-  const res = await signAndSend(
+  const txHash = await signAndSend(
     RELAYER_ADDRESS_PRIVATE_KEY,
     data,
     nonce,
@@ -151,15 +161,15 @@ async function processTx(payload: TxPayload, jobId: string | undefined) {
     await web3.eth.getChainId(),
     web3
   )
-  logger.debug(`Job ${jobId}: TX hash ${res}`)
+  logger.debug(`${logPrefix} TX hash ${txHash}`)
 
   await updateNonce(nonce + 1)
   await updateTransferNum(transferNum)
 
-  logger.debug(`Job ${jobId}: Updating tree`)
+  logger.debug(`${logPrefix} Updating tree`)
   pool.appendHashes(hashes)
 
-  logger.debug(`Job ${jobId}: Adding tx to storage`)
+  logger.debug(`${logPrefix} Adding tx to storage`)
   // 16 + 16 + 40
   let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
   const truncatedMemo = rawMemo.slice(txSpecificPrefixLen)
@@ -171,7 +181,7 @@ async function processTx(payload: TxPayload, jobId: string | undefined) {
 export function createTxWorker() {
   const worker = new Worker<TxPayload>(TX_QUEUE_NAME, job => {
     logger.info(`Processing job ${job.id}...`)
-    return processTx(job.data, job.id)
+    return processTx(job)
   })
 
   return worker

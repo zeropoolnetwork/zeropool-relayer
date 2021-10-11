@@ -10,7 +10,22 @@ import { TxType } from './utils/helpers'
 import { decodeMemo } from './utils/memo'
 import { TX_QUEUE_NAME } from './utils/constants'
 import { Queue } from 'bullmq'
-import { Params, TreePub, TreeSec, Proof, MerkleTree, TxStorage, Helpers, MerkleProof, TransferPub, TransferSec, Constants } from 'libzeropool-rs-node'
+import {
+  Params,
+  TreePub,
+  TreeSec,
+  Proof,
+  MerkleTree,
+  TxStorage,
+  Helpers,
+  MerkleProof,
+  TransferPub,
+  TransferSec,
+  Constants,
+  SnarkProof,
+  VK
+} from 'libzeropool-rs-node'
+import txVK from '../transfer_verification_key.json'
 
 export interface TxPayload {
   to: string
@@ -25,13 +40,20 @@ export interface TxPayload {
 class Pool {
   public PoolInstance: Contract
   private treeParams: Params
+  private txParams: Params
+  private txVK: VK
   public tree: MerkleTree
   public txs: TxStorage
   private txQueue: Queue<TxPayload>
 
   constructor() {
     this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
+
     this.treeParams = Params.fromFile('./tree_params.bin')
+    this.txParams = Params.fromFile('./transfer_params.bin')
+
+    this.txVK = txVK
+
     this.tree = new MerkleTree('./tree.db')
     this.txs = new TxStorage('./txs.db')
     this.txQueue = new Queue(TX_QUEUE_NAME, {
@@ -151,12 +173,15 @@ class Pool {
   }
 
   getTxProof(pub: TransferPub, sec: TransferSec) {
-    const params = Params.fromFile('./transfer_params.bin')
-    return Proof.tx(params, pub, sec)
+    return Proof.tx(this.txParams, pub, sec)
   }
 
   getTreeProof(pub: TreePub, sec: TreeSec): Proof {
     return Proof.tree(this.treeParams, pub, sec)
+  }
+
+  verifyProof(proof: SnarkProof, inputs: Array<string>) {
+    return Proof.verify(this.txVK, proof, inputs)
   }
 
   async getContractMerkleRoot(index: string | undefined | null): Promise<string> {
