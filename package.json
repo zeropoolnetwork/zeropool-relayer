@@ -5,7 +5,7 @@
     "build:libzeropool-rs-node": "npm --prefix libzeropool-rs/libzeropool-rs-node run build",
     "build:libzeropool-rs-wasm": "cd libzeropool-rs/libzeropool-rs-wasm && ./scripts/build && cd -",
     "start:dev": "ts-node src/index.ts",
-    "start:prod": "node build/src/index.js",
+    "start:prod": "node build/index.js",
     "test": "ts-mocha --timeout 1000000 test/**/*.test.ts"
   },
   "dependencies": {

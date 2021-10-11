@@ -179,10 +179,16 @@ async function processTx(job: Job<TxPayload>) {
 
 
 export function createTxWorker() {
-  const worker = new Worker<TxPayload>(TX_QUEUE_NAME, job => {
-    logger.info(`Processing job ${job.id}...`)
-    return processTx(job)
-  })
+  const worker = new Worker<TxPayload>(
+    TX_QUEUE_NAME,
+    job => {
+      logger.info(`Processing job ${job.id}...`)
+      return processTx(job)
+    },
+    {
+      connection: redis
+    }
+  )
 
   return worker
 }

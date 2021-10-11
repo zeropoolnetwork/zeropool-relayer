@@ -19,13 +19,20 @@ WORKDIR /app/libzeropool-rs/libzeropool-rs-node
 RUN npm run build
 
 
-FROM node:16 as build
+FROM node:16 as base
 
 WORKDIR /app
 
 COPY --from=libzeropool-rs /app/libzeropool-rs/libzeropool-rs-node/ /app/libzeropool-rs/libzeropool-rs-node/
+COPY --from=verifier /app/tree_params.bin /app/
+COPY --from=verifier /app/tx_params.bin /app/transfer_params.bin
+COPY --from=verifier /app/tx_vk.json /app/transfer_verification_key.json
+
 COPY ./package.json ./
 COPY ./yarn.lock ./
+
+
+FROM base as build
 
 RUN yarn install --frozen-lockfile
 
@@ -35,16 +42,11 @@ COPY ./src ./src
 RUN yarn build
 
 
-FROM node:16
+FROM base
 
 WORKDIR /app
 
-COPY --from=verifier /app/tree_params.bin /app/
-COPY --from=verifier /app/tx_params.bin /app/transfer_params.bin
-
-COPY --from=libzeropool-rs /app/libzeropool-rs/libzeropool-rs-node/ /app/libzeropool-rs/libzeropool-rs-node/
-
-COPY --from=build /app/build/src ./build/src
+COPY --from=build /app/build/src ./build
 COPY ./package.json ./
 COPY ./yarn.lock ./
 

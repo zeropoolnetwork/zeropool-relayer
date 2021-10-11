@@ -2,15 +2,6 @@
 
 set -e
 
-trap cleanup EXIT
-
-cleanup() {
-  if [ "$KEEP_RUNNING" != true ]; then
-    docker-compose down
-  fi
-}
-cleanup
-
 docker-compose build contracts
 
 echo "Starting our own ganache instance"

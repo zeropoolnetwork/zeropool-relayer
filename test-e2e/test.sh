@@ -4,8 +4,8 @@ trap cleanup EXIT
 
 cleanup() {
   [[ ! -z "$http_server_pid" ]] && kill $http_server_pid
-  docker-compose stop contracts relayer
-  docker-compose kill contracts relayer
+  docker-compose rm -s -f relayer
+  docker-compose down
 }
 cleanup
 
@@ -14,8 +14,11 @@ echo "Deploying contracts..."
 ./scripts/deploy.sh &>/dev/null &
 sleep 15
 echo "Starting relayer..."
-docker-compose run -e RPC_URL=ws://ganache:8545 -p 8000:8000 relayer &
+docker-compose run -e RPC_URL=ws://ganache:8545 -e RELAYER_REDIS_URL=redis:6379 -p 8000:8000 relayer &
 cd -
+
+echo "Staring redis..."
+docker-compose up redis &>/dev/null &
 
 echo "Starting file server..."
 npx http-server &>/dev/null &
