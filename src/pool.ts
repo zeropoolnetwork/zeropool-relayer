@@ -5,11 +5,9 @@ import { Contract } from 'web3-eth-contract'
 import { config } from './config/config'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
-import { redis } from './services/redisClient'
+import { txQueue } from './services/jobQueue'
 import { TxType } from './utils/helpers'
 import { decodeMemo } from './utils/memo'
-import { TX_QUEUE_NAME } from './utils/constants'
-import { Queue } from 'bullmq'
 import {
   Params,
   TreePub,
@@ -27,16 +25,6 @@ import {
 } from 'libzeropool-rs-node'
 import txVK from '../transfer_verification_key.json'
 
-export interface TxPayload {
-  to: string
-  amount: string
-  gas: string | number
-  txProof: Proof
-  txType: TxType
-  rawMemo: string
-  depositSignature: string | null
-}
-
 class Pool {
   public PoolInstance: Contract
   private treeParams: Params
@@ -44,7 +32,6 @@ class Pool {
   private txVK: VK
   public tree: MerkleTree
   public txs: TxStorage
-  private txQueue: Queue<TxPayload>
 
   constructor() {
     this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
@@ -56,9 +43,6 @@ class Pool {
 
     this.tree = new MerkleTree('./tree.db')
     this.txs = new TxStorage('./txs.db')
-    this.txQueue = new Queue(TX_QUEUE_NAME, {
-      connection: redis
-    })
 
     this.syncState()
   }
@@ -66,7 +50,7 @@ class Pool {
   async transact(txProof: Proof, rawMemo: string, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
     logger.debug('Adding tx job to queue')
     // TODO maybe store memo in redis as a path to a file
-    const job = await this.txQueue.add('test-tx', {
+    const job = await txQueue.add('test-tx', {
       to: config.poolAddress,
       amount: '0',
       gas: 5000000,
@@ -76,6 +60,7 @@ class Pool {
       depositSignature
     })
     logger.debug(`Added job: ${job.id}`)
+    return job.id
   }
 
   getVirtualTreeProof(hashes: Buffer[]) {

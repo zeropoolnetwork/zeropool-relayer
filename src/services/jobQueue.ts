@@ -1,16 +1,19 @@
 import { Queue } from 'bullmq'
 import { redis } from './redisClient'
 import { TX_QUEUE_NAME } from '../utils/constants'
+import { TxType } from '../utils/helpers'
+import { Proof } from 'libzeropool-rs-node'
 
-interface TxPayload {
+export interface TxPayload {
   to: string
-  data: string
-  amount: string | number
+  amount: string
   gas: string | number
-  hashes: Buffer[]
+  txProof: Proof
+  txType: TxType
+  rawMemo: string
+  depositSignature: string | null
 }
-
-export const txQueue = new Queue<TxPayload>(TX_QUEUE_NAME, {
+export const txQueue = new Queue<TxPayload, string>(TX_QUEUE_NAME, {
   connection: redis
 })
 

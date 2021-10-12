@@ -135,6 +135,4 @@ You can use already implemented [client](https://github.com/zeropoolnetwork/libz
 
 9. Send `proof`, `memo` (get it from `tx_object.memo`), `txType` (`0..2`) and `depositSignature` to `/transaction` endpoint.
 
-
-
 You can check more details in `test-e2e` example

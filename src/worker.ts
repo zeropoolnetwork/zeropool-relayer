@@ -4,6 +4,7 @@ import { Job, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
+import { TxPayload } from './services/jobQueue'
 import { getNonce } from './utils/web3'
 import { decodeMemo } from './utils/memo'
 import { TX_QUEUE_NAME } from './utils/constants'
@@ -11,8 +12,7 @@ import { TxType, numToHex, flattenProof, truncateHexPrefix } from './utils/helpe
 import { signAndSend } from './tx/signAndSend'
 import { config } from './config/config'
 import { Helpers, Proof } from 'libzeropool-rs-node'
-import { pool, TxPayload } from './pool'
-import { assert } from 'console'
+import { pool } from './pool'
 
 const nonceKey = `relayer:nonce`
 const transferNumKey = `relayer:transferNum`
@@ -73,7 +73,9 @@ function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: str
   const nullifier = numToHex(txProof.inputs[1])
   const out_commit = numToHex(treeProof.inputs[2])
 
-  assert(treeProof.inputs[2] == txProof.inputs[2], 'commmitment error')
+  if (treeProof.inputs[2] !== txProof.inputs[2]) {
+    throw new Error('commmitment error')
+  }
 
   const delta = Helpers.parseDelta(txProof.inputs[3])
   const transfer_index = numToHex(delta.index, 12)
@@ -175,6 +177,8 @@ async function processTx(job: Job<TxPayload>) {
   const truncatedMemo = rawMemo.slice(txSpecificPrefixLen)
   const commitAndMemo = numToHex(treeProof.inputs[2]).concat(truncatedMemo)
   pool.txs.add(transferNum, Buffer.from(commitAndMemo, 'hex'))
+
+  return txHash
 }
 
 

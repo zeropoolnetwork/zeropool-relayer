@@ -7,6 +7,7 @@ import { pool } from './pool'
 import { assert } from 'console'
 import { MerkleProof } from 'libzeropool-rs-node'
 import { createTxWorker } from './worker'
+import { txQueue } from './services/jobQueue'
 
 
 const worker = createTxWorker()
@@ -74,8 +75,23 @@ router.get('/merkle/proof', (req, res) => {
 
 router.post('/transaction', async (req, res) => {
   const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
-  await pool.transact(proof, memo, txType, depositSignature)
-  res.json('OK')
+  const jobId = await pool.transact(proof, memo, txType, depositSignature)
+  res.json({jobId})
+})
+
+router.get('/job/:id', async (req, res) => {
+  const jobId = req.params.id
+  const job = await txQueue.getJob(jobId)
+  if (job) {
+    const state = await job.getState()
+    const txHash = job.returnvalue
+    res.json({
+      state,
+      txHash,
+    })
+  } else {
+    res.json(`Job ${jobId} not found`)
+  }
 })
 
 router.get('/info', (req, res) => {
