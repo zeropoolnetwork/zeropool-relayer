@@ -1,9 +1,11 @@
 import Web3 from 'web3'
+import { Buffer } from 'buffer'
 import { toBN } from 'web3-utils'
-import { UserAccount, UserState, getConstants } from 'libzeropool-rs-wasm-bundler';
+import { decodeMemo } from './memo'
 import TokenAbi from './token-abi.json'
 import { postData, concatArrays, numToHex, fakeTxProof, packSignature } from './utils'
 import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
+import { UserAccount, UserState, getConstants, Helpers } from 'libzeropool-rs-wasm-bundler'
 
 const expect = chai.expect
 export const web3 = new Web3(rpcUrl)
@@ -43,51 +45,54 @@ export async function syncNotesAndAccount(account: UserAccount, numTxs = 20n, of
   ).then(r => r.json())
 
   // Extract user's accounts and notes from memo blocks
-  const indices = []
   for (let txNum = 0; txNum <= txs.length; txNum++) {
     const tx = txs[txNum]
     if (!tx) continue
 
-    // First 32 bytes is nullifier
+    // @ts-ignore
+    accountToDelta[account] = (txNum + 1) * 128
+
+    // little-endian
+    const commitment = Uint8Array.from(tx.data.slice(0, 32)).reverse()
+    console.log('Memo commit', Helpers.numToStr(commitment))
+    account.addCommitment(BigInt(txNum), commitment)
+
     const buf = Uint8Array.from(tx.data.slice(32))
 
     const numLeafs = BigInt(constants.OUT + 1)
     const accountOffset = BigInt(offset + BigInt(txNum) * numLeafs)
 
+    let found = false
     const pair = account.decryptPair(buf)
     if (pair) {
       account.addAccount(accountOffset, pair.account)
-      indices.push(accountOffset.toString())
+      found = true
     }
 
     const notes = account.decryptNotes(buf)
-
     for (const n of notes) {
       if (!n) continue
       const noteIndex = accountOffset + 1n + BigInt(n.index)
       account.addReceivedNote(noteIndex, n.note)
-      indices.push(noteIndex.toString())
+      found = true
+    }
+
+    if (found) {
+      console.log('Found assets for account')
+      console.log('Decoding memo')
+      try {
+        const memo = decodeMemo(Buffer.from(buf), null);
+        const hashes = [memo.accHash].concat(memo.noteHashes)
+        hashes
+          .map(Helpers.numToStr)
+          .forEach((hash, i) => {
+            account.addMerkleLeaf(accountOffset + BigInt(i), hash)
+          })
+      } catch (error) {
+        console.log(error)
+      }
     }
   }
-
-  const { proofs, root, deltaIndex } = await getMerkleProofs(indices)
-  expect(proofs.length).eq(indices.length)
-
-  for (let i = 0; i < proofs.length; i++) {
-    const proof = proofs[i]
-    const index = indices[i]
-    if (proof) account.addMerkleProof(BigInt(index), proof.sibling)
-  }
-  account.addMerkleSubtreeRoot(constants.HEIGHT, 0n, root)
-
-  // @ts-ignore
-  accountToDelta[account] = deltaIndex
-}
-
-async function getMerkleProofs(indeces: (string | number)[]) {
-  const query = indeces.reduce((prev, cur) => `${prev}&index=${cur}`, '')
-  const proofs = await fetch(`${relayerUrl}/merkle/proof?${query}`).then(r => r.json())
-  return proofs
 }
 
 async function proofAndSend(mergeTx: any, fake: boolean, txType: string, depositSignature: string | null) {
@@ -139,6 +144,7 @@ async function createTx(account: UserAccount, type: string, value: any, data: Ui
   // @ts-ignore
   const index = accountToDelta[account] || 0
   const mergeTx = await account.createTx(type, value, data, BigInt(index))
+  console.log('Delta', mergeTx.parsed_delta)
   return mergeTx
 }
 

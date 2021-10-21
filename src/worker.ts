@@ -6,8 +6,8 @@ import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
 import { TxPayload } from './services/jobQueue'
 import { getNonce } from './utils/web3'
-import { decodeMemo } from './utils/memo'
-import { TX_QUEUE_NAME } from './utils/constants'
+import { TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
+import { readTransferNum, updateTransferNum } from './utils/tranferNum'
 import { TxType, numToHex, flattenProof, truncateHexPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
 import { config } from './config/config'
@@ -15,7 +15,6 @@ import { Helpers, Proof } from 'libzeropool-rs-node'
 import { pool } from './pool'
 
 const nonceKey = `relayer:nonce`
-const transferNumKey = `relayer:transferNum`
 
 const {
   RELAYER_ADDRESS_PRIVATE_KEY,
@@ -42,29 +41,6 @@ function updateNonce(nonce: number) {
   return redis.set(nonceKey, nonce)
 }
 
-async function readTransferNum(forceUpdate?: boolean) {
-  const getTransferNum = () => pool.PoolInstance.methods.transfer_num().call()
-
-  logger.debug('Reading transferNum')
-  if (forceUpdate) {
-    logger.debug('Forcing update of transferNum')
-    return getTransferNum()
-  }
-
-  const num = await redis.get(transferNumKey)
-  if (num) {
-    logger.debug(`TransferNum found in the DB ${num}`)
-    return Number(num)
-  } else {
-    logger.warn(`Nonce wasn't found in the DB`)
-    return getTransferNum()
-  }
-}
-
-function updateTransferNum(num: number) {
-  return redis.set(transferNumKey, num)
-}
-
 const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
 
 function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: string, depositSignature: string | null) {
@@ -74,7 +50,7 @@ function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: str
   const out_commit = numToHex(treeProof.inputs[2])
 
   if (treeProof.inputs[2] !== txProof.inputs[2]) {
-    throw new Error('commmitment error')
+    throw new Error('Commmitment mismatch')
   }
 
   const delta = Helpers.parseDelta(txProof.inputs[3])
@@ -122,7 +98,7 @@ async function processTx(job: Job<TxPayload>) {
     txProof,
     txType,
     rawMemo,
-    depositSignature
+    depositSignature,
   } = job.data
   const jobId = job.id
 
@@ -135,11 +111,9 @@ async function processTx(job: Job<TxPayload>) {
     throw new Error('Incorrect transfer proof')
   }
 
-  const memo = decodeMemo(Buffer.from(rawMemo, 'hex'), txType)
-
-  const hashes = [memo.accHash].concat(memo.noteHashes)
-
-  const { proof: treeProof, transferNum } = pool.getVirtualTreeProof(hashes)
+  const outCommit = txProof.inputs[2]
+  const transferNum = await readTransferNum()
+  const { proof: treeProof, nextCommitIndex } = pool.getVirtualTreeProof(outCommit, transferNum)
 
   const data = buildTxData(
     txProof,
@@ -166,23 +140,24 @@ async function processTx(job: Job<TxPayload>) {
   logger.debug(`${logPrefix} TX hash ${txHash}`)
 
   await updateNonce(nonce + 1)
-  await updateTransferNum(transferNum)
+  await updateTransferNum(transferNum + OUTPLUSONE)
 
   logger.debug(`${logPrefix} Updating tree`)
-  pool.appendHashes(hashes)
-
+  pool.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
   logger.debug(`${logPrefix} Adding tx to storage`)
   // 16 + 16 + 40
   let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
   const truncatedMemo = rawMemo.slice(txSpecificPrefixLen)
-  const commitAndMemo = numToHex(treeProof.inputs[2]).concat(truncatedMemo)
+  const commitAndMemo = numToHex(outCommit).concat(truncatedMemo)
   pool.txs.add(transferNum, Buffer.from(commitAndMemo, 'hex'))
 
   return txHash
 }
 
 
-export function createTxWorker() {
+export async function createTxWorker() {
+  // Reset nonce
+  await readNonce(true)
   const worker = new Worker<TxPayload>(
     TX_QUEUE_NAME,
     job => {
@@ -193,6 +168,7 @@ export function createTxWorker() {
       connection: redis
     }
   )
+  logger.info(`Worker ${worker.name}`)
 
   return worker
 }

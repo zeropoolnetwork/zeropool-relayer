@@ -7,7 +7,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { txQueue } from './services/jobQueue'
 import { TxType } from './utils/helpers'
-import { decodeMemo } from './utils/memo'
+import { OUTPLUSONE } from './utils/constants'
 import {
   Params,
   TreePub,
@@ -15,7 +15,6 @@ import {
   Proof,
   MerkleTree,
   TxStorage,
-  Helpers,
   MerkleProof,
   TransferPub,
   TransferSec,
@@ -57,26 +56,24 @@ class Pool {
       txProof,
       txType,
       rawMemo,
-      depositSignature
+      depositSignature,
     })
     logger.debug(`Added job: ${job.id}`)
     return job.id
   }
 
-  getVirtualTreeProof(hashes: Buffer[]) {
+  getVirtualTreeProof(outCommit: string, transferNum: number) {
     logger.debug(`Building virtual tree proof...`)
-    const outCommit = Helpers.outCommitmentHash(hashes)
-    const nextCommitIndex = Math.floor(this.tree.getNextIndex() / 128)
+    const nextCommitIndex = Math.floor(transferNum / OUTPLUSONE)
     const prevCommitIndex = nextCommitIndex - 1
 
-    const transferNum = nextCommitIndex * 128
     const root_before = this.tree.getRoot()
     const root_after = this.tree.getVirtualNode(
       Constants.HEIGHT,
       0,
       [[[Constants.OUTLOG, nextCommitIndex], outCommit]],
       transferNum,
-      transferNum + 128
+      transferNum + OUTPLUSONE
     )
 
     const proof_filled = this.tree.getCommitmentProof(prevCommitIndex)
@@ -88,29 +85,31 @@ class Pool {
     logger.debug(`Virtual root ${root_after}; Commit ${outCommit}; Index ${nextCommitIndex}`)
 
     logger.debug('Proving tree...')
+    const treePub = {
+      root_before,
+      root_after,
+      leaf,
+    }
+    const treeSec = {
+      proof_filled,
+      proof_free,
+      prev_leaf,
+    }
     const proof = Proof.tree(
       this.treeParams,
-      {
-        root_before,
-        root_after,
-        leaf,
-      },
-      {
-        proof_filled,
-        proof_free,
-        prev_leaf,
-      }
+      treePub,
+      treeSec
     )
     logger.debug('proved')
 
     return {
       proof,
-      transferNum,
+      nextCommitIndex,
     }
   }
 
-  async appendHashes(hashes: Buffer[]) {
-    hashes.forEach(h => this.tree.appendHash(h))
+  addCommitment(index: number, commit: Buffer) {
+    this.tree.addCommitment(index, commit)
   }
 
   getDbTx(i: number): [string, string] | null {
@@ -136,21 +135,17 @@ class Pool {
         const emptyHash = Buffer.alloc(32)
         this.tree.addHash(i, emptyHash)
       }
+      // Clear tx storage
+      for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
+        this.txs.delete(i)
+      }
 
       const events = await this.PoolInstance.getPastEvents('Message', { fromBlock })
-      let leafIndex = 0
       events.forEach(async ({ returnValues, transactionHash }) => {
         const memoString: string = returnValues.message
         if (!memoString) return
+        // TODO process memo
         const buf = Buffer.from(memoString.slice(2), 'hex')
-        const memo = decodeMemo(buf, null)
-        const notes = memo.noteHashes
-
-        this.tree.addHash(leafIndex, memo.accHash)
-        for (let i = 0; i < 127; i++) {
-          this.tree.addHash(leafIndex + i + 1, notes[i])
-        }
-        leafIndex += 128
       })
       localRoot = this.getLocalMerkleRoot()
       logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
@@ -167,6 +162,11 @@ class Pool {
 
   verifyProof(proof: SnarkProof, inputs: Array<string>) {
     return Proof.verify(this.txVK, proof, inputs)
+  }
+
+  async getContractTransferNum() {
+    const transferNum = await pool.PoolInstance.methods.transfer_num().call()
+    return Number(transferNum)
   }
 
   async getContractMerkleRoot(index: string | undefined | null): Promise<string> {
@@ -188,9 +188,9 @@ class Pool {
 
   getTransactions(limit: number, offset: number) {
     const txs: (Buffer | null)[] = new Array(limit)
-    offset = Math.ceil(offset / 128)
+    offset = Math.ceil(offset / OUTPLUSONE)
     for (let i = 0; i < limit; i++) {
-      txs[i] = this.txs.get(offset + i * 128)
+      txs[i] = this.txs.get(offset + i * OUTPLUSONE)
     }
     return txs
   }

@@ -1,3 +1,4 @@
+import './env'
 import fs from 'fs'
 import cors from 'cors'
 import express from 'express'
@@ -9,9 +10,13 @@ import { MerkleProof } from 'libzeropool-rs-node'
 import { createTxWorker } from './worker'
 import { txQueue } from './services/jobQueue'
 
+const {
+  TX_PROOFS_DIR,
+} = process.env as Record<PropertyKey, string>
 
-const worker = createTxWorker()
-logger.info(`Worker ${worker.name}`)
+fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
+
+createTxWorker()
 
 const PORT = 8000
 const app = express()
@@ -21,14 +26,18 @@ app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
 app.use(express.text())
 
-const router = express.Router();
+const router = express.Router()
+
+let txProofNum = 0
 
 // Used only for testing as proving on client is now slow
 router.post('/proof_tx', (req, res) => {
   logger.debug('Proving tx...')
   const { pub, sec } = JSON.parse(req.body)
-  const curIndex = pool.tree.getNextIndex()
-  fs.writeFileSync(`object${curIndex}.json`, JSON.stringify([pub, sec], null, 2))
+  if (logger.isDebugEnabled()) {
+    fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
+    txProofNum += 1
+  }
   const proof = pool.getTxProof(pub, sec)
   logger.debug('Tx proved')
   res.json(proof)
@@ -76,7 +85,7 @@ router.get('/merkle/proof', (req, res) => {
 router.post('/transaction', async (req, res) => {
   const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
   const jobId = await pool.transact(proof, memo, txType, depositSignature)
-  res.json({jobId})
+  res.json({ jobId })
 })
 
 router.get('/job/:id', async (req, res) => {

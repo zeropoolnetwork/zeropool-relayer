@@ -14,7 +14,7 @@ echo "Deploying contracts..."
 ./scripts/deploy.sh &>/dev/null &
 sleep 15
 echo "Starting relayer..."
-docker-compose run -e RPC_URL=ws://ganache:8545 -e RELAYER_REDIS_URL=redis:6379 -p 8000:8000 relayer &
+docker-compose run -e RPC_URL=http://ganache:8545 -e RELAYER_REDIS_URL=redis:6379 -p 8000:8000 relayer &
 cd -
 
 echo "Staring redis..."

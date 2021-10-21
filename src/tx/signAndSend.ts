@@ -1,6 +1,5 @@
 import BN from 'bn.js'
 import Web3 from 'web3'
-import { TransactionReceipt } from 'web3-eth'
 import { toWei } from 'web3-utils'
 
 export async function signAndSend(
