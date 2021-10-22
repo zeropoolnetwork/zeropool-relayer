@@ -92,42 +92,30 @@ Returns:
 (Buffer|null)[]
 ```
 
-`/merkle/proof?[index]` - recieves list of indecies as get params
-
-Returns
-```
-{
-    root, // indicates state of the tree for returned proofs
-    deltaIndex, // this index should be used for building tx proof
-    proofs, // merkle proofs
-}
-```
-
 ## Workflow
 
 *High-level overview*:
 
-1. Client fetches and decrypts all his notes and accounts either from relayer or directly from the blockchain
-    **NOTE**: now clients can ask the relayer to get merkle proofs for notes and accounts to simplify pool interaction, but in the future, this functionality will be removed. The client will have to build their own local tree from previous transactions' commitments.
+1. Client fetches all commitments and memo blocks (either from relayer or directly from the blockchain) and decrypts their notes and accounts. All commitments should be stored in local Merkle tree, together with found notes and accounts.
 2. Client builds a zk-SNARK proof for the transaction using previously fetched notes and the most recent account. Then this proof, together with public inputs, memo block, and optional nullifier signature (used only for deposits), is sent to the relayer.
-3. Relayer adds a job to the queue. It checks that the tx proof is valid, builds another zk-SNARK proof for tree update, sends tx to blockchain, and updates local merkle tree using sent data. It also locally stores commitment hash (one of the public inputs) and memo messages.
+3. Relayer adds a job to the queue. It checks that the tx proof is valid, builds another zk-SNARK proof for tree update, sends tx to the blockchain, and updates the local Merkle tree using sent data. It also locally stores commitment hash (one of the public inputs) and memo messages.
 
 You can use already implemented [client](https://github.com/zeropoolnetwork/libzeropool-rs/tree/main/libzeropool-rs-wasm) to interact with the protocol.
 
 
 *Technical overview of* `libzeropool-rs`:
 
-1. Client uses *IndexedDB* as storage for accounts, notes, and merkle tree nodes.
+1. Client uses *IndexedDB* as storage for accounts, notes, and Merkle tree nodes.
 
 2. You can create or restore an account via `createAccount` function, providing a secret key and state.
 
 3. Then, you can request commitments and memos for previous transactions via `/transactions/:limit/:offset` relayer endpoint.
 
-4. Decode incoming notes with `decryptNotes` and add them with `addReceivedNote`. Decode your accounts with `decryptPair` and add them with `addAccount`.
+4. Decrypt incoming notes with `decryptNotes` and add them with `addReceivedNote`. Decrypt your accounts with `decryptPair` and add them with `addAccount`.
 
-5. For each note and account request a merkle proof via `/merkle/proof?[index]` endpoint and add them to the local merkle tree with `addMerkleProof`. Don't forget to update tree root with `addMerkleSubtreeRoot`. Also, store somewhere `deltaIndex` returned together with merkle proofs.
+5. Insert received commitments and decoded hashes of leaves in the tree 
 
-6. Call `createTx` function, providing `deltaIndex` stored previously. It will generate a tx object.
+6. Call `createTx` function, providing correct `deltaIndex`, which is basically the index of the first leaf in the next transaction (`(txNum + 1) * 128`). It will generate a tx object.
 
 7. If you are making a deposit, generate a signature for the tx nullifier (you can get it from `tx_object.public.nullifier`) and store it.
 
