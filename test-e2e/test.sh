@@ -5,7 +5,7 @@ trap cleanup EXIT
 cleanup() {
   [[ ! -z "$http_server_pid" ]] && kill $http_server_pid
   docker-compose rm -s -f relayer
-  docker-compose down
+  docker-compose down -v
 }
 cleanup
 

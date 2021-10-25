@@ -12,13 +12,13 @@ You can optionally install `wasm-opt` to perform some optimizations to the clien
 yarn initialize
 ```
 
-3. Copy proving params to local machine
+3. Add `.env` configuration file
+
+4. Copy proving params to local machine
 
 ```bash
 ./scripts/copy_params.sh
 ```
-
-4. Add `.env` configuration file
 
 5. Start local ganache and deploy contracts
 
