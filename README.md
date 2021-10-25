@@ -12,27 +12,33 @@ You can optionally install `wasm-opt` to perform some optimizations to the clien
 yarn initialize
 ```
 
-3. Add `.env` configuration file
+3. Pull latest docker images (optional)
 
-4. Copy proving params to local machine
+```bash
+docker-compose pull
+```
+
+4. Add `.env` configuration file
+
+5. Copy proving params to local machine
 
 ```bash
 ./scripts/copy_params.sh
 ```
 
-5. Start local ganache and deploy contracts
+6. Start local ganache and deploy contracts
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-6. Start redis
+7. Start redis
 
 ```bash
 docker-compose up redis
 ```
 
-7. Start relayer
+8. Start relayer
     * Locally
     ```bash
     yarn start:dev

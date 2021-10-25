@@ -1,5 +1,3 @@
-docker-compose build verifier
-
 echo "Create container"
 c_id=$(docker create lok52/verifier)
 echo $c_id

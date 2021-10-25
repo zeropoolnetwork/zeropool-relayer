@@ -8,9 +8,15 @@
 yarn
 ```
 
-2. Set RPC_URL in `.env` file to `ws://ganache:8545`
+2. Pull latest docker images (optional)
 
-3. Run test script
+```bash
+docker-compose pull
+```
+
+3. Set RPC_URL in `.env` file to `http://ganache:8545`
+
+4. Run test script
 
 ```bash
 ./test.sh
