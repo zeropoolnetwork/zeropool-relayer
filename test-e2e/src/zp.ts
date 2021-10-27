@@ -34,7 +34,7 @@ export async function getBalanceDiff(address: string, f: Function) {
 
 export async function syncAccounts(accounts: UserAccount[]) {
   for (const account of accounts) {
-    console.log("syncing")
+    console.log('syncing')
     await syncNotesAndAccount(account)
   }
 }

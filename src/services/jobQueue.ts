@@ -16,4 +16,3 @@ export interface TxPayload {
 export const txQueue = new Queue<TxPayload, string>(TX_QUEUE_NAME, {
   connection: redis
 })
-

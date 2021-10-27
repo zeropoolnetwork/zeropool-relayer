@@ -5,81 +5,66 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
 import { TxPayload } from './services/jobQueue'
-import { getNonce } from './utils/web3'
 import { TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
-import { readTransferNum, updateTransferNum } from './utils/tranferNum'
-import { TxType, numToHex, flattenProof, truncateHexPrefix } from './utils/helpers'
+import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
+import { TxType, numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
-import { config } from './config/config'
 import { Helpers, Proof } from 'libzeropool-rs-node'
 import { pool } from './pool'
 
-const nonceKey = `relayer:nonce`
+const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[])
 
 const {
   RELAYER_ADDRESS_PRIVATE_KEY,
 } = process.env as Record<PropertyKey, string>
 
-async function readNonce(forceUpdate?: boolean) {
-  logger.debug('Reading nonce')
-  if (forceUpdate) {
-    logger.debug('Forcing update of nonce')
-    return await getNonce(web3, config.relayerAddress)
-  }
 
-  const nonce = await redis.get(nonceKey)
-  if (nonce) {
-    logger.debug(`Nonce found in the DB ${nonce} `)
-    return Number(nonce)
-  } else {
-    logger.warn(`Nonce wasn't found in the DB`)
-    return getNonce(web3, config.relayerAddress)
+function parseDelta(delta: string) {
+  const { index, e, v } = Helpers.parseDelta(delta)
+  return {
+    transferIndex: numToHex(index, 12),
+    energyAmount: numToHex(e, 16),
+    tokenAmount: numToHex(v, 16),
   }
 }
-
-function updateNonce(nonce: number) {
-  return redis.set(nonceKey, nonce)
-}
-
-const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
 
 function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: string, depositSignature: string | null) {
   const selector: string = PoolInstance.methods.transact().encodeABI()
 
   const nullifier = numToHex(txProof.inputs[1])
-  const out_commit = numToHex(treeProof.inputs[2])
+  const outCommit = numToHex(treeProof.inputs[2])
 
   if (treeProof.inputs[2] !== txProof.inputs[2]) {
     throw new Error('Commmitment mismatch')
   }
 
-  const delta = Helpers.parseDelta(txProof.inputs[3])
-  const transfer_index = numToHex(delta.index, 12)
-  const enery_amount = numToHex(delta.e, 16)
-  const token_amount = numToHex(delta.v, 16)
+  const {
+    transferIndex,
+    energyAmount,
+    tokenAmount
+  } = parseDelta(txProof.inputs[3])
 
-  const transact_proof = flattenProof(txProof.proof)
+  const txFlatProof = flattenProof(txProof.proof)
 
-  const root_after = numToHex(treeProof.inputs[1])
-  const tree_proof = flattenProof(treeProof.proof)
+  const rootAfter = numToHex(treeProof.inputs[1])
+  const treeFlatProof = flattenProof(treeProof.proof)
 
-  const tx_type = txType
-  const memo_message = memo
-  const memo_size = numToHex((memo_message.length / 2).toString(), 4)
+  const memoMessage = memo
+  const memoSize = numToHex((memoMessage.length / 2).toString(), 4)
 
   const data = [
     selector,
     nullifier,
-    out_commit,
-    transfer_index,
-    enery_amount,
-    token_amount,
-    transact_proof,
-    root_after,
-    tree_proof,
-    tx_type,
-    memo_size,
-    memo_message
+    outCommit,
+    transferIndex,
+    energyAmount,
+    tokenAmount,
+    txFlatProof,
+    rootAfter,
+    treeFlatProof,
+    txType,
+    memoSize,
+    memoMessage
   ]
 
   if (depositSignature) {
@@ -112,8 +97,11 @@ async function processTx(job: Job<TxPayload>) {
   }
 
   const outCommit = txProof.inputs[2]
-  const transferNum = await readTransferNum()
-  const { proof: treeProof, nextCommitIndex } = pool.getVirtualTreeProof(outCommit, transferNum)
+  const transferNum = Number(await readTransferNum())
+  const {
+    proof: treeProof,
+    nextCommitIndex
+  } = pool.getVirtualTreeProof(outCommit, transferNum)
 
   const data = buildTxData(
     txProof,
@@ -123,7 +111,7 @@ async function processTx(job: Job<TxPayload>) {
     depositSignature
   )
 
-  const nonce = await readNonce()
+  const nonce = Number(await readNonce())
   const txHash = await signAndSend(
     RELAYER_ADDRESS_PRIVATE_KEY,
     data,
@@ -139,16 +127,16 @@ async function processTx(job: Job<TxPayload>) {
   )
   logger.debug(`${logPrefix} TX hash ${txHash}`)
 
-  await updateNonce(nonce + 1)
-  await updateTransferNum(transferNum + OUTPLUSONE)
+  await updateField(RelayerKeys.NONCE, nonce + 1)
+  await updateField(RelayerKeys.TRANSFER_NUM, transferNum + OUTPLUSONE)
+
+  const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
+  const commitAndMemo = numToHex(outCommit).concat(truncatedMemo)
 
   logger.debug(`${logPrefix} Updating tree`)
   pool.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
+
   logger.debug(`${logPrefix} Adding tx to storage`)
-  // 16 + 16 + 40
-  let txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
-  const truncatedMemo = rawMemo.slice(txSpecificPrefixLen)
-  const commitAndMemo = numToHex(outCommit).concat(truncatedMemo)
   pool.txs.add(transferNum, Buffer.from(commitAndMemo, 'hex'))
 
   return txHash
@@ -157,7 +145,9 @@ async function processTx(job: Job<TxPayload>) {
 
 export async function createTxWorker() {
   // Reset nonce
-  await readNonce(true)
+  const nonce = Number(await readNonce(true))
+  await updateField(RelayerKeys.NONCE, nonce + 1)
+
   const worker = new Worker<TxPayload>(
     TX_QUEUE_NAME,
     job => {

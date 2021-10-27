@@ -8,6 +8,25 @@ export enum TxType {
   WITHDRAWAL = '02',
 }
 
+export function toTxType(t: string): TxType {
+  t = truncateHexPrefix(t)
+  if (
+    t === TxType.DEPOSIT ||
+    t === TxType.TRANSFER ||
+    t === TxType.WITHDRAWAL
+  ) {
+    return t
+  } else {
+    throw new Error('incorrect tx type')
+  }
+}
+
+export function truncateMemoTxPrefix(memo: string, txType: TxType) {
+  // 16 + 16 + 40
+  const txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
+  return memo.slice(txSpecificPrefixLen)
+}
+
 export function truncateHexPrefix(data: string) {
   if (data.startsWith('0x')) {
     data = data.slice(2)

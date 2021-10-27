@@ -6,8 +6,11 @@ import { config } from './config/config'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { txQueue } from './services/jobQueue'
-import { TxType } from './utils/helpers'
 import { OUTPLUSONE } from './utils/constants'
+import { getEvents, getTransaction } from './utils/web3'
+import { PoolCalldataParser } from './utils/PoolCalldataParser'
+import { RelayerKeys, updateField } from './utils/redisFields'
+import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix, TxType } from './utils/helpers'
 import {
   Params,
   TreePub,
@@ -20,7 +23,8 @@ import {
   TransferSec,
   Constants,
   SnarkProof,
-  VK
+  VK,
+  Helpers,
 } from 'libzeropool-rs-node'
 import txVK from '../transfer_verification_key.json'
 
@@ -140,13 +144,38 @@ class Pool {
         this.txs.delete(i)
       }
 
-      const events = await this.PoolInstance.getPastEvents('Message', { fromBlock })
-      events.forEach(async ({ returnValues, transactionHash }) => {
+      const events = await getEvents(this.PoolInstance, 'Message', { fromBlock })
+      for (let txNum = 0; txNum < events.length; txNum++) {
+        const { returnValues, transactionHash } = events[txNum]
+
         const memoString: string = returnValues.message
-        if (!memoString) return
-        // TODO process memo
-        const buf = Buffer.from(memoString.slice(2), 'hex')
-      })
+        if (!memoString) {
+          throw new Error('incorrect memo in event')
+        }
+
+        const { input } = await getTransaction(web3, transactionHash)
+        const calldata = Buffer.from(truncateHexPrefix(input), 'hex')
+        
+        const parser = new PoolCalldataParser(calldata)
+
+        const outCommitRaw = parser.getField('outCommit')
+        const outCommit = web3.utils.hexToNumberString(outCommitRaw)
+
+        const txTypeRaw = parser.getField('txType')
+        const txType = toTxType(txTypeRaw)
+
+        const memoSize = web3.utils.hexToNumber(parser.getField('memoSize'))
+        const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
+        
+        const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
+        const commitAndMemo = numToHex(outCommit).concat(truncatedMemo)
+
+        this.addCommitment(txNum, Helpers.strToNum(outCommit))
+        pool.txs.add(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
+      }
+
+      await updateField(RelayerKeys.TRANSFER_NUM, events.length * OUTPLUSONE)
+
       localRoot = this.getLocalMerkleRoot()
       logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
     }
