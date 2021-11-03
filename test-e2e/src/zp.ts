@@ -1,7 +1,7 @@
 import Web3 from 'web3'
 import { Buffer } from 'buffer'
 import { toBN } from 'web3-utils'
-import { decodeMemo } from './memo'
+import { decodeMemo } from '../../common/memo'
 import TokenAbi from './token-abi.json'
 import { postData, concatArrays, numToHex, fakeTxProof, packSignature } from './utils'
 import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'

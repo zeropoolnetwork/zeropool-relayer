@@ -11,6 +11,8 @@ import { TxType, numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix
 import { signAndSend } from './tx/signAndSend'
 import { Helpers, Proof } from 'libzeropool-rs-node'
 import { pool } from './pool'
+import { getTxData } from '../common/memo'
+import { config } from './config/config'
 
 const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[])
 
@@ -28,15 +30,36 @@ function parseDelta(delta: string) {
   }
 }
 
+function checkCommitment(treeProof: Proof, txProof: Proof) {
+  return treeProof.inputs[2] === txProof.inputs[2]
+}
+
+function checkTxProof(txProof: Proof) {
+  return pool.verifyProof(txProof.proof, txProof.inputs)
+}
+
+function checkFeeAndNativeAmount(memo: string, txType: TxType) {
+  const buf = Buffer.from(memo.slice(2), 'hex')
+  const { fee, nativeAmount } = getTxData(buf, txType)
+  logger.debug(`Fee: ${fee}`)
+  logger.debug(`Native amount: ${nativeAmount}`)
+  // Check native amount (relayer faucet)
+  if (nativeAmount && nativeAmount > config.maxFaucet) {
+    return false
+  }
+  // Check user fee
+  if (fee >= config.relayerFee) {
+    return false
+  }
+  return true
+}
+
 function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: string, depositSignature: string | null) {
+
   const selector: string = PoolInstance.methods.transact().encodeABI()
 
   const nullifier = numToHex(txProof.inputs[1])
   const outCommit = numToHex(treeProof.inputs[2])
-
-  if (treeProof.inputs[2] !== txProof.inputs[2]) {
-    throw new Error('Commmitment mismatch')
-  }
 
   const {
     transferIndex,
@@ -89,9 +112,12 @@ async function processTx(job: Job<TxPayload>) {
 
   const logPrefix = `Job ${jobId}:`
 
-  const verifyRes = pool.verifyProof(txProof.proof, txProof.inputs)
+  if (!checkFeeAndNativeAmount(rawMemo, txType)) {
+    logger.error(`${logPrefix} fee too low`)
+    throw new Error('Fee too low')
+  }
 
-  if (!verifyRes) {
+  if (!checkTxProof(txProof)) {
     logger.error(`${logPrefix} proof verification failed`)
     throw new Error('Incorrect transfer proof')
   }
@@ -102,6 +128,11 @@ async function processTx(job: Job<TxPayload>) {
     proof: treeProof,
     nextCommitIndex
   } = pool.getVirtualTreeProof(outCommit, transferNum)
+
+  if (!checkCommitment(treeProof, txProof)) {
+    logger.error(`${logPrefix} commmitment mismatch`)
+    throw new Error('Commmitment mismatch')
+  }
 
   const data = buildTxData(
     txProof,

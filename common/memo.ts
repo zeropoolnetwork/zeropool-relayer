@@ -2,6 +2,7 @@ import BN from 'bn.js'
 import { Buffer } from 'buffer'
 import { deserialize, BinaryReader } from 'borsh'
 
+type Option<T> = T | null
 
 export enum TxType {
   DEPOSIT = '00',
@@ -14,7 +15,7 @@ const U256_SIZE = 32
 const POLY_1305_TAG_SIZE = 16
 const ACCOUNT_SIZE = 64
 const NOTE_SIZE = 60
-const ZERO_NOTE_HASH = Uint8Array.from([205,67,21,69,218,80,86,210,193,254,80,77,140,200,120,159,225,78,91,230,207,158,63,231,197,180,251,16,82,219,170,14])
+const ZERO_NOTE_HASH = Uint8Array.from([205, 67, 21, 69, 218, 80, 86, 210, 193, 254, 80, 77, 140, 200, 120, 159, 225, 78, 91, 230, 207, 158, 63, 231, 197, 180, 251, 16, 82, 219, 170, 14])
 
 
 class Assignable {
@@ -33,12 +34,12 @@ export class Memo extends Assignable {
   noteHashes!: Uint8Array[]
   rawNoteHashes!: Buffer
   a_p_x!: number
-  fee!: BN | null
-  amount!: BN | null
-  address!: Uint8Array | null
+  fee!: Option<BN>
+  nativeAmount!: Option<BN>
+  address!: Option<Uint8Array>
 }
 
-function memoBorshSchema(numNotes: number) {
+function clientBorshSchema(numNotes: number) {
   const fields = [
     ['accHash', [U256_SIZE]],
     ['rawNoteHashes', [numNotes * U256_SIZE]],
@@ -71,25 +72,37 @@ function getNoteHashes(rawHashes: Buffer, num: number, maxNotes: number): Uint8A
   return notes
 }
 
-export function decodeMemo(data: Buffer, txType: TxType | null, maxNotes = 127) {
-  const reader = new BinaryReader(data)
+export function getTxData(data: Buffer | BinaryReader, txType: Option<TxType>) {
+  const reader = Buffer.isBuffer(data) ? new BinaryReader(data) : data
   let fee = null
-  let amount = null
+  let nativeAmount = null
   let addres = null
-  if (txType) {
-    fee = reader.readU64()
-    if (txType === TxType.WITHDRAWAL) {
-      amount = reader.readU64()
-      addres = reader.readFixedArray(20)
-    }
+  fee = reader.readU64()
+  if (txType === TxType.WITHDRAWAL) {
+    nativeAmount = reader.readU64()
+    addres = reader.readFixedArray(20)
   }
+  return {
+    fee,
+    nativeAmount,
+    addres,
+  }
+}
+
+export function decodeMemo(data: Buffer, txType: Option<TxType>, maxNotes = 127) {
+  const reader = new BinaryReader(data)
+  const {
+    fee,
+    nativeAmount,
+    addres,
+  } = getTxData(reader, txType)
   const numItems = new DataView(reader.readFixedArray(4).buffer).getUint32(0, true)
-  const memo: Memo = deserialize(memoBorshSchema(numItems - 1), Memo, data.slice(reader.offset))
+  const memo: Memo = deserialize(clientBorshSchema(numItems - 1), Memo, data.slice(reader.offset))
   memo.numItems = numItems
   memo.noteHashes = getNoteHashes(memo.rawNoteHashes, numItems - 1, maxNotes)
   memo.rawBuf = data
   memo.fee = fee
-  memo.amount = amount
+  memo.nativeAmount = nativeAmount
   memo.address = addres
   return memo
 }
