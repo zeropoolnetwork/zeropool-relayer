@@ -3,17 +3,16 @@ import { Buffer } from 'buffer'
 import { toBN } from 'web3-utils'
 import { decodeMemo } from '../../common/memo'
 import TokenAbi from './token-abi.json'
-import { postData, concatArrays, numToHex, fakeTxProof, packSignature } from './utils'
+import { postData, numToHex, fakeTxProof, packSignature } from './utils'
 import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
-import { UserAccount, UserState, getConstants, Helpers } from 'libzeropool-rs-wasm-bundler'
+import { UserAccount, UserState, getConstants, Helpers, IWithdrawData, IDepositData, ITransferData } from 'libzeropool-rs-wasm-bundler'
 
 const expect = chai.expect
 export const web3 = new Web3(rpcUrl)
 export const token = new web3.eth.Contract(TokenAbi as any, tokenAddress)
 export const energyToken = new web3.eth.Contract(TokenAbi as any, energyAddress)
 export const denominator = toBN(1000000000)
-const zero_fee = new Uint8Array(8).fill(0)
-const zero_amount = new Uint8Array(8).fill(0)
+const empty_data = Uint8Array.from([])
 const constants = getConstants()
 const accountToDelta = {}
 
@@ -59,38 +58,32 @@ export async function syncNotesAndAccount(account: UserAccount, numTxs = 20n, of
 
     const buf = Uint8Array.from(tx.data.slice(32))
 
+    console.log(buf.toString().slice(0, 100))
+    console.log(buf.length)
+
+    const memo = decodeMemo(Buffer.from(buf), null);
+    const hashes = [memo.accHash].concat(memo.noteHashes).map(Helpers.numToStr)
+
     const numLeafs = BigInt(constants.OUT + 1)
     const accountOffset = BigInt(offset + BigInt(txNum) * numLeafs)
 
-    let found = false
     const pair = account.decryptPair(buf)
     if (pair) {
-      account.addAccount(accountOffset, pair.account)
-      found = true
+      console.log(pair.account)
+      account.addAccount(accountOffset, hashes, pair.account, [])
     }
 
     const notes = account.decryptNotes(buf)
-    for (const n of notes) {
-      if (!n) continue
-      const noteIndex = accountOffset + 1n + BigInt(n.index)
-      account.addReceivedNote(noteIndex, n.note)
-      found = true
-    }
-
-    if (found) {
-      console.log('Found assets for account')
-      console.log('Decoding memo')
-      try {
-        const memo = decodeMemo(Buffer.from(buf), null);
-        const hashes = [memo.accHash].concat(memo.noteHashes)
-        hashes
-          .map(Helpers.numToStr)
-          .forEach((hash, i) => {
-            account.addMerkleLeaf(accountOffset + BigInt(i), hash)
-          })
-      } catch (error) {
-        console.log(error)
-      }
+      .filter(({ note }) => note.b !== '0')
+      .map(({ note, index }) => {
+        return {
+          note,
+          index: parseInt(accountOffset.toString()) + 1 + index
+        }
+      })
+    if (notes.length > 0) {
+      console.log(notes)
+      account.addNotes(accountOffset, hashes, notes)
     }
   }
 }
@@ -140,20 +133,19 @@ export async function createAccount(sk: number[]) {
   return account
 }
 
-async function createTx(account: UserAccount, type: string, value: any, data: Uint8Array) {
-  // @ts-ignore
-  const index = accountToDelta[account] || 0
-  const mergeTx = await account.createTx(type, value, data, BigInt(index))
-  console.log('Delta', mergeTx.parsed_delta)
-  return mergeTx
-}
-
 export async function deposit(account: UserAccount, from: string, amount: string, fake = false) {
   const amounBN = toBN(amount)
   console.log('Approving tokens...')
   await token.methods.approve(zpAddress, amounBN.mul(denominator)).send({ from })
   console.log('Making a deposit...')
-  const mergeTx = await createTx(account, 'deposit', amount, zero_fee)
+  const deposit: IDepositData = {
+    base_fields: {
+      fee: '0',
+      data: empty_data,
+    },
+    amount,
+  }
+  const mergeTx = await account.createDeposit(deposit)
   const depositSignature = web3.eth.accounts.sign(
     numToHex(web3, mergeTx.public.nullifier),
     clientPK
@@ -164,15 +156,31 @@ export async function deposit(account: UserAccount, from: string, amount: string
 
 export async function transfer(account: UserAccount, to: string, amount: string, fake = false) {
   console.log('Making a transfer...')
-  const mergeTx = await createTx(account, 'transfer', [{ to, amount }], zero_fee)
+  const transfer: ITransferData = {
+    base_fields: {
+      fee: '0',
+      data: empty_data,
+    },
+    outputs: [{ to, amount }]
+  }
+  const mergeTx = await account.createTransfer(transfer)
   await proofAndSend(mergeTx, fake, '01', null)
   return mergeTx
 }
 
-export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, fake = false) {
-  const withdraw_data = concatArrays([zero_fee, zero_amount, to])
+export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, fake = false) {
   console.log('Making a withdraw...')
-  const mergeTx = await createTx(account, 'withdraw', amount, withdraw_data)
+  const withdraw: IWithdrawData = {
+    base_fields: {
+      fee: '0',
+      data: empty_data
+    },
+    amount,
+    to,
+    native_amount: '0',
+    energy_amount,
+  }
+  const mergeTx = await account.createWithdraw(withdraw)
   await proofAndSend(mergeTx, fake, '02', null)
   return mergeTx
 }

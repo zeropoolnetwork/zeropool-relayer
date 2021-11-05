@@ -47,7 +47,7 @@ describe('ZP client', () => {
       mergeTx = await deposit(account, from, '5')
 
       // Wait until deposit is processed
-      await sleep(20000)
+      await sleep(17000)
 
       await syncAccounts([account, accountOther])
       tokenBalanceAfter = await getTokenBalance(from)
@@ -61,29 +61,30 @@ describe('ZP client', () => {
       mergeTx = await transfer(account, accountOther.generateAddress(), '1')
 
       // Wait until transfer is processed
-      await sleep(20000)
+      await sleep(17000)
 
       await syncAccounts([account, accountOther])
 
       expect(account.totalBalance()).eq('4')
       expect(accountOther.totalBalance()).eq('1')
 
-      // Withdraw from first account
       tokenBalanceBefore = await getTokenBalance(from)
-      mergeTx = await withdraw(account, addressToUint8(from), '2')
+      // Withdraw from first account
+      // Total 1152 energy
+      mergeTx = await withdraw(account, addressToUint8(from), '2', '500')
 
       // Withdraw from second account
-      mergeTx = await withdraw(accountOther, addressToUint8(from), '1')
+      // Total 127 energy
+      mergeTx = await withdraw(accountOther, addressToUint8(from), '1', '55')
 
       // Wait until both withdrawals are processed
-      await sleep(40000)
+      await sleep(35000)
 
       await syncAccounts([account, accountOther])
       tokenBalanceAfter = await getTokenBalance(from)
       energyBalance = await getEnergyBalance(from)
 
-      // 1152 from first withdraw + 127 from second one
-      expect(energyBalance).bignumber.eq(denominator.mul(toBN(1279)))
+      expect(energyBalance).bignumber.eq(denominator.mul(toBN(555)))
 
       balanceDiff = tokenBalanceAfter.sub(tokenBalanceBefore)
       // 2 from first + 1 from second

@@ -1,6 +1,7 @@
 import BN from 'bn.js'
 import { Buffer } from 'buffer'
 import { deserialize, BinaryReader } from 'borsh'
+import { toBN } from 'web3-utils'
 
 type Option<T> = T | null
 
@@ -34,9 +35,6 @@ export class Memo extends Assignable {
   noteHashes!: Uint8Array[]
   rawNoteHashes!: Buffer
   a_p_x!: number
-  fee!: Option<BN>
-  nativeAmount!: Option<BN>
-  address!: Option<Uint8Array>
 }
 
 function clientBorshSchema(numNotes: number) {
@@ -72,15 +70,21 @@ function getNoteHashes(rawHashes: Buffer, num: number, maxNotes: number): Uint8A
   return notes
 }
 
-export function getTxData(data: Buffer | BinaryReader, txType: Option<TxType>) {
-  const reader = Buffer.isBuffer(data) ? new BinaryReader(data) : data
+export function getTxData(data: Buffer, txType: Option<TxType>) {
+  function readU64(offset: number) {
+    let uint = data.readBigUInt64BE(offset)
+    return toBN(uint.toString())
+  }
   let fee = null
   let nativeAmount = null
   let addres = null
-  fee = reader.readU64()
+  let offset = 0
+  fee = readU64(offset)
+  offset += 8
   if (txType === TxType.WITHDRAWAL) {
-    nativeAmount = reader.readU64()
-    addres = reader.readFixedArray(20)
+    nativeAmount = readU64(offset)
+    offset += 8
+    addres = new Uint8Array(data.slice(offset, offset + 20))
   }
   return {
     fee,
@@ -91,18 +95,10 @@ export function getTxData(data: Buffer | BinaryReader, txType: Option<TxType>) {
 
 export function decodeMemo(data: Buffer, txType: Option<TxType>, maxNotes = 127) {
   const reader = new BinaryReader(data)
-  const {
-    fee,
-    nativeAmount,
-    addres,
-  } = getTxData(reader, txType)
   const numItems = new DataView(reader.readFixedArray(4).buffer).getUint32(0, true)
   const memo: Memo = deserialize(clientBorshSchema(numItems - 1), Memo, data.slice(reader.offset))
   memo.numItems = numItems
   memo.noteHashes = getNoteHashes(memo.rawNoteHashes, numItems - 1, maxNotes)
   memo.rawBuf = data
-  memo.fee = fee
-  memo.nativeAmount = nativeAmount
-  memo.address = addres
   return memo
 }

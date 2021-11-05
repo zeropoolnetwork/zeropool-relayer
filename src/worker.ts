@@ -39,7 +39,7 @@ function checkTxProof(txProof: Proof) {
 }
 
 function checkFeeAndNativeAmount(memo: string, txType: TxType) {
-  const buf = Buffer.from(memo.slice(2), 'hex')
+  const buf = Buffer.from(memo, 'hex')
   const { fee, nativeAmount } = getTxData(buf, txType)
   logger.debug(`Fee: ${fee}`)
   logger.debug(`Native amount: ${nativeAmount}`)
@@ -48,10 +48,17 @@ function checkFeeAndNativeAmount(memo: string, txType: TxType) {
     return false
   }
   // Check user fee
-  if (fee >= config.relayerFee) {
+  if (fee < config.relayerFee) {
     return false
   }
   return true
+}
+
+function checkAssertion(f: Function, errStr: string) {
+  if (!f()) {
+    logger.error(errStr)
+    throw new Error(errStr)
+  }
 }
 
 function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: string, depositSignature: string | null) {
@@ -66,6 +73,7 @@ function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: str
     energyAmount,
     tokenAmount
   } = parseDelta(txProof.inputs[3])
+  logger.debug(`DELTA ${transferIndex} ${energyAmount} ${tokenAmount}`)
 
   const txFlatProof = flattenProof(txProof.proof)
 
@@ -112,15 +120,15 @@ async function processTx(job: Job<TxPayload>) {
 
   const logPrefix = `Job ${jobId}:`
 
-  if (!checkFeeAndNativeAmount(rawMemo, txType)) {
-    logger.error(`${logPrefix} fee too low`)
-    throw new Error('Fee too low')
-  }
+  checkAssertion(
+    () => checkFeeAndNativeAmount(rawMemo, txType),
+    `${logPrefix} Fee too low`
+  )
 
-  if (!checkTxProof(txProof)) {
-    logger.error(`${logPrefix} proof verification failed`)
-    throw new Error('Incorrect transfer proof')
-  }
+  checkAssertion(
+    () => checkTxProof(txProof),
+    `${logPrefix} Incorrect transfer proof`
+  )
 
   const outCommit = txProof.inputs[2]
   const transferNum = Number(await readTransferNum())
@@ -129,10 +137,10 @@ async function processTx(job: Job<TxPayload>) {
     nextCommitIndex
   } = pool.getVirtualTreeProof(outCommit, transferNum)
 
-  if (!checkCommitment(treeProof, txProof)) {
-    logger.error(`${logPrefix} commmitment mismatch`)
-    throw new Error('Commmitment mismatch')
-  }
+  checkAssertion(
+    () => checkCommitment(treeProof, txProof),
+    `${logPrefix} Commmitment mismatch`
+  )
 
   const data = buildTxData(
     txProof,
