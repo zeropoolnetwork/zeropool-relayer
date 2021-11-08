@@ -139,10 +139,8 @@ export async function deposit(account: UserAccount, from: string, amount: string
   await token.methods.approve(zpAddress, amounBN.mul(denominator)).send({ from })
   console.log('Making a deposit...')
   const deposit: IDepositData = {
-    base_fields: {
-      fee: '0',
-      data: empty_data,
-    },
+    fee: '0',
+    data: empty_data,
     amount,
   }
   const mergeTx = await account.createDeposit(deposit)
@@ -157,10 +155,8 @@ export async function deposit(account: UserAccount, from: string, amount: string
 export async function transfer(account: UserAccount, to: string, amount: string, fake = false) {
   console.log('Making a transfer...')
   const transfer: ITransferData = {
-    base_fields: {
-      fee: '0',
-      data: empty_data,
-    },
+    fee: '0',
+    data: empty_data,
     outputs: [{ to, amount }]
   }
   const mergeTx = await account.createTransfer(transfer)
@@ -171,10 +167,8 @@ export async function transfer(account: UserAccount, to: string, amount: string,
 export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, fake = false) {
   console.log('Making a withdraw...')
   const withdraw: IWithdrawData = {
-    base_fields: {
-      fee: '0',
-      data: empty_data
-    },
+    fee: '0',
+    data: empty_data,
     amount,
     to,
     native_amount: '0',
