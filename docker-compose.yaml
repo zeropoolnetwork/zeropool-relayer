@@ -41,7 +41,7 @@ services:
     volumes:
       - relayer_tree:/app/tree.db
       - relayer_txs:/app/txs.db
-    env_file: .env
+    env_file: zp-relayer/.env
     ports:
       - 8000:8000
     depends_on:

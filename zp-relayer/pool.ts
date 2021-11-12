@@ -56,7 +56,7 @@ class Pool {
     const job = await txQueue.add('test-tx', {
       to: config.poolAddress,
       amount: '0',
-      gas: 5000000,
+      gas: config.relayerGasLimit.toString(),
       txProof,
       txType,
       rawMemo,
