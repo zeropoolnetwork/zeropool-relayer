@@ -1,7 +1,7 @@
 import Web3 from 'web3'
 import { Buffer } from 'buffer'
 import { toBN } from 'web3-utils'
-import { decodeMemo } from '../../common/memo'
+import { decodeMemo } from 'zp-memo-parser'
 import TokenAbi from './token-abi.json'
 import { postData, numToHex, fakeTxProof, packSignature } from './utils'
 import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
@@ -12,7 +12,6 @@ export const web3 = new Web3(rpcUrl)
 export const token = new web3.eth.Contract(TokenAbi as any, tokenAddress)
 export const energyToken = new web3.eth.Contract(TokenAbi as any, energyAddress)
 export const denominator = toBN(1000000000)
-const empty_data = Uint8Array.from([])
 const constants = getConstants()
 const accountToDelta = {}
 
@@ -139,10 +138,7 @@ export async function deposit(account: UserAccount, from: string, amount: string
   await token.methods.approve(zpAddress, amounBN.mul(denominator)).send({ from })
   console.log('Making a deposit...')
   const deposit: IDepositData = {
-    base_fields: {
-      fee: '0',
-      data: empty_data,
-    },
+    fee: '0',
     amount,
   }
   const mergeTx = await account.createDeposit(deposit)
@@ -157,10 +153,7 @@ export async function deposit(account: UserAccount, from: string, amount: string
 export async function transfer(account: UserAccount, to: string, amount: string, fake = false) {
   console.log('Making a transfer...')
   const transfer: ITransferData = {
-    base_fields: {
-      fee: '0',
-      data: empty_data,
-    },
+    fee: '0',
     outputs: [{ to, amount }]
   }
   const mergeTx = await account.createTransfer(transfer)
@@ -171,10 +164,7 @@ export async function transfer(account: UserAccount, to: string, amount: string,
 export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, fake = false) {
   console.log('Making a withdraw...')
   const withdraw: IWithdrawData = {
-    base_fields: {
-      fee: '0',
-      data: empty_data
-    },
+    fee: '0',
     amount,
     to,
     native_amount: '0',

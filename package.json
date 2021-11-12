@@ -1,46 +1,22 @@
 {
-  "scripts": {
-    "initialize": "git submodule update --init && yarn install --unsafe-perm --frozen-lockfile && yarn build:libzeropool-rs-node && yarn build:libzeropool-rs-wasm",
-    "build": "tsc --project ./",
-    "build:libzeropool-rs-node": "npm --prefix libzeropool-rs/libzeropool-rs-node run build",
-    "build:libzeropool-rs-wasm": "cd libzeropool-rs/libzeropool-rs-wasm && ./scripts/build && cd -",
-    "start:dev": "ts-node src/index.ts",
-    "start:prod": "node build/index.js",
-    "test": "ts-mocha --timeout 1000000 test/**/*.test.ts"
-  },
-  "dependencies": {
-    "borsh": "^0.5.0",
-    "bullmq": "1.48.3",
-    "cors": "^2.8.5",
-    "dotenv": "^10.0.0",
-    "express": "^4.17.1",
-    "express-winston": "4.2.0",
-    "ioredis": "4.27.10",
-    "libzeropool-rs-node": "link:./libzeropool-rs/libzeropool-rs-node",
-    "node-fetch": "^2.6.1",
-    "promise-retry": "^2.0.1",
-    "ts-node": "^10.1.0",
-    "web3": "1.2.11",
-    "winston": "3.3.3"
-  },
+  "name": "zp-relayer",
+  "version": "0.0.1",
+  "private": true,
   "devDependencies": {
-    "@types/chai": "^4.2.21",
-    "@types/cors": "^2.8.12",
-    "@types/expect": "^24.3.0",
-    "@types/express": "^4.17.13",
-    "@types/ioredis": "^4.27.6",
-    "@types/mocha": "^9.0.0",
-    "@types/node": "^16.4.11",
-    "@types/node-fetch": "^2.5.12",
-    "@types/promise-retry": "^1.1.3",
-    "chai": "^4.3.4",
-    "mocha": "^9.0.3",
-    "nodemon": "^2.0.12",
-    "npm-run-all": "^4.1.5",
-    "ts-loader": "^9.2.4",
-    "ts-mocha": "^8.0.0",
     "typescript": "^4.3.5",
-    "webpack": "^5.48.0",
-    "webpack-cli": "^4.7.2"
+    "ts-loader": "^9.2.4",
+    "chai": "^4.3.4"
+  },
+  "workspaces": [
+    "zp-memo-parser",
+    "zp-relayer",
+    "test-e2e"
+  ],
+  "scripts": {
+    "initialize": "yarn clean && git submodule update --init && yarn install --unsafe-perm --frozen-lockfile && yarn build:libzeropool-rs-node && yarn build:libzeropool-rs-wasm",
+    "build:relayer": "yarn workspace zp-relayer run build",
+    "build:memo": "yarn workspace zp-memo-parser run build",
+    "build:libzeropool-rs-node": "npm --prefix libzeropool-rs/libzeropool-rs-node run build",
+    "build:libzeropool-rs-wasm": "cd libzeropool-rs/libzeropool-rs-wasm && ./scripts/build && cd -"
   }
 }

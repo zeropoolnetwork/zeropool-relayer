@@ -21,7 +21,7 @@ echo "Staring redis..."
 docker-compose up redis &>/dev/null &
 
 echo "Starting file server..."
-npx http-server &>/dev/null &
+npx http-server .. &>/dev/null &
 http_server_pid=$!
 echo "Building test bundle..."
 yarn build:dev &>/dev/null

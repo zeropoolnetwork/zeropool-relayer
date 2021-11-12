@@ -1,9 +1,9 @@
 import { expect } from 'chai'
-import { decodeMemo } from '../test-e2e/src/memo'
+import { decodeMemo } from 'zp-memo-parser/memo'
 import { MerkleTree, Constants, Helpers } from 'libzeropool-rs-node'
 import depositMemo from './depositMemo.json'
 import fs from 'fs'
-import { TxType } from '../src/utils/helpers'
+import { TxType } from '../utils/helpers'
 
 const DB_PATH = './test-tree.db'
 

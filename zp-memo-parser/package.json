@@ -1,0 +1,17 @@
+{
+  "name": "zp-memo-parser",
+  "version": "0.0.1",
+  "license": "MIT",
+  "main": "build/memo.js",
+  "types": "build/memo.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "borsh": "^0.5.0",
+    "buffer": "^6.0.3",
+    "stream-http": "^3.2.0",
+    "webpack": "^5.46.0",
+    "web3": "1.2.11"
+  }
+}

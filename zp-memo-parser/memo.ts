@@ -1,4 +1,3 @@
-import BN from 'bn.js'
 import { Buffer } from 'buffer'
 import { deserialize, BinaryReader } from 'borsh'
 import { toBN } from 'web3-utils'

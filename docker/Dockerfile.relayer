@@ -24,34 +24,35 @@ FROM node:16 as base
 WORKDIR /app
 
 COPY --from=libzeropool-rs /app/libzeropool-rs/libzeropool-rs-node/ /app/libzeropool-rs/libzeropool-rs-node/
-COPY --from=verifier /app/tree_params.bin /app/
-COPY --from=verifier /app/tx_params.bin /app/transfer_params.bin
-COPY --from=verifier /app/tx_vk.json /app/transfer_verification_key.json
+COPY --from=verifier /app/tx_vk.json /app/zp-relayer/transfer_verification_key.json
 
-COPY ./package.json ./
-COPY ./yarn.lock ./
+COPY package.json ./
+COPY yarn.lock ./
+COPY tsconfig.json ./
+
+COPY zp-relayer/package.json ./zp-relayer/
+COPY zp-memo-parser/package.json ./zp-memo-parser/
+
+RUN yarn install --frozen-lockfile
+
+COPY zp-memo-parser ./zp-memo-parser
+RUN yarn build:memo
 
 
 FROM base as build
 
-RUN yarn install --frozen-lockfile
-
-COPY ./tsconfig.json ./
-COPY ./src ./src
-
-RUN yarn build
+COPY zp-relayer ./zp-relayer
+RUN yarn build:relayer
 
 
 FROM base
 
-WORKDIR /app
+WORKDIR /app/zp-relayer
 
-COPY --from=build /app/build/src ./build
-COPY ./package.json ./
-COPY ./yarn.lock ./
-
-RUN yarn install --frozen-lockfile --production
+COPY --from=build /app/zp-relayer/build ./build
+COPY --from=verifier /app/tree_params.bin ./
+COPY --from=verifier /app/tx_params.bin ./transfer_params.bin
 
 EXPOSE 8000
 
-CMD yarn start:prod
+CMD yarn workspace zp-relayer run start:prod

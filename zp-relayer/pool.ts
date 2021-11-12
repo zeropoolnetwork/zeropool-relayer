@@ -26,7 +26,7 @@ import {
   VK,
   Helpers,
 } from 'libzeropool-rs-node'
-import txVK from '../transfer_verification_key.json'
+import txVK from './transfer_verification_key.json'
 
 class Pool {
   public PoolInstance: Contract

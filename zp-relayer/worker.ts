@@ -11,7 +11,7 @@ import { TxType, numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix
 import { signAndSend } from './tx/signAndSend'
 import { Helpers, Proof } from 'libzeropool-rs-node'
 import { pool } from './pool'
-import { getTxData } from '../common/memo'
+import { getTxData } from 'zp-memo-parser'
 import { config } from './config/config'
 
 const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[])
