@@ -8,10 +8,12 @@ const {
   RELAYER_FEE,
   RELAYER_GAS_LIMIT,
   MAX_NATIVE_AMOUNT_FAUCET,
+  PORT,
 } = process.env as Record<PropertyKey, string>
 
 const relayerAddress = new Web3().eth.accounts.privateKeyToAccount(RELAYER_ADDRESS_PRIVATE_KEY).address
 export const config = {
+  port: parseInt(PORT),
   relayerAddress,
   relayerPrivateKey: RELAYER_ADDRESS_PRIVATE_KEY,
   relayerGasLimit: toBN(RELAYER_GAS_LIMIT),

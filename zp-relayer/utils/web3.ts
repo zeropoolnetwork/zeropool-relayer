@@ -41,3 +41,15 @@ export async function getTransaction(web3: Web3, hash: string) {
     throw new Error(`${hash} tx cannot be obtained`)
   }
 }
+
+export async function getChainId(web3: Web3) {
+  try {
+    logger.debug('Getting chain id')
+    const chainId = await web3.eth.getChainId()
+    logger.debug(`Chain id obtained ${chainId}`)
+    return chainId
+  } catch (e) {
+    if (e instanceof Error) logger.error(e.message)
+    throw new Error('Chain Id cannot be obtained')
+  }
+}

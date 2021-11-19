@@ -6,6 +6,7 @@ import { logger } from './services/appLogger'
 import { createLoggerMiddleware } from './services/loggerMiddleware'
 import { createTxWorker } from './worker'
 import endpoints from './endpoints'
+import { config } from './config/config'
 
 const {
   TX_PROOFS_DIR,
@@ -15,7 +16,6 @@ fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
 
 createTxWorker()
 
-const PORT = 8000
 const app = express()
 
 app.use(cors())
@@ -38,4 +38,4 @@ app.use(createLoggerMiddleware('zp.log'))
 
 app.use(router)
 
-app.listen(PORT, () => logger.info(`Started relayer on port ${PORT}`))
+app.listen(config.port, () => logger.info(`Started relayer on port ${config.port}`))

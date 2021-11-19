@@ -4,10 +4,9 @@ import { toBN } from 'web3-utils'
 import { decodeMemo } from 'zp-memo-parser'
 import TokenAbi from './token-abi.json'
 import { postData, numToHex, fakeTxProof, packSignature } from './utils'
-import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
+import { rpcUrl, relayerUrlFirst, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
 import { UserAccount, UserState, getConstants, Helpers, IWithdrawData, IDepositData, ITransferData } from 'libzeropool-rs-wasm-bundler'
 
-const expect = chai.expect
 export const web3 = new Web3(rpcUrl)
 export const token = new web3.eth.Contract(TokenAbi as any, tokenAddress)
 export const energyToken = new web3.eth.Contract(TokenAbi as any, energyAddress)
@@ -30,14 +29,14 @@ export async function getBalanceDiff(address: string, f: Function) {
   return balanceAfter.sub(balanceBefore)
 }
 
-export async function syncAccounts(accounts: UserAccount[]) {
+export async function syncAccounts(accounts: UserAccount[], relayerUrl = relayerUrlFirst) {
   for (const account of accounts) {
     console.log('syncing')
-    await syncNotesAndAccount(account)
+    await syncNotesAndAccount(account, relayerUrl)
   }
 }
 
-export async function syncNotesAndAccount(account: UserAccount, numTxs = 20n, offset = 0n) {
+export async function syncNotesAndAccount(account: UserAccount, relayerUrl = relayerUrlFirst, numTxs = 20n, offset = 0n) {
   const txs = await fetch(
     `${relayerUrl}/transactions/${numTxs.toString()}/${offset.toString()}`
   ).then(r => r.json())
@@ -87,7 +86,7 @@ export async function syncNotesAndAccount(account: UserAccount, numTxs = 20n, of
   }
 }
 
-async function proofAndSend(mergeTx: any, fake: boolean, txType: string, depositSignature: string | null) {
+async function proofAndSend(mergeTx: any, fake: boolean, txType: string, depositSignature: string | null, relayerUrl: string) {
   let data
   if (fake) {
     data = {
@@ -126,13 +125,13 @@ async function proofAndSend(mergeTx: any, fake: boolean, txType: string, deposit
     })
 }
 
-export async function createAccount(sk: number[]) {
-  const state = await UserState.init("any user identifier")
+export async function createAccount(sk: number[], stateId: string) {
+  const state = await UserState.init(stateId)
   const account = new UserAccount(Uint8Array.from(sk), state)
   return account
 }
 
-export async function deposit(account: UserAccount, from: string, amount: string, fake = false) {
+export async function deposit(account: UserAccount, from: string, amount: string, relayerUrl = relayerUrlFirst, fake = false) {
   const amounBN = toBN(amount)
   console.log('Approving tokens...')
   await token.methods.approve(zpAddress, amounBN.mul(denominator)).send({ from })
@@ -146,22 +145,22 @@ export async function deposit(account: UserAccount, from: string, amount: string
     numToHex(web3, mergeTx.public.nullifier),
     clientPK
   )
-  await proofAndSend(mergeTx, fake, '00', packSignature(depositSignature))
+  await proofAndSend(mergeTx, fake, '00', packSignature(depositSignature), relayerUrl)
   return mergeTx
 }
 
-export async function transfer(account: UserAccount, to: string, amount: string, fake = false) {
+export async function transfer(account: UserAccount, to: string, amount: string, relayerUrl = relayerUrlFirst, fake = false) {
   console.log('Making a transfer...')
   const transfer: ITransferData = {
     fee: '0',
     outputs: [{ to, amount }]
   }
   const mergeTx = await account.createTransfer(transfer)
-  await proofAndSend(mergeTx, fake, '01', null)
+  await proofAndSend(mergeTx, fake, '01', null, relayerUrl)
   return mergeTx
 }
 
-export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, fake = false) {
+export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, relayerUrl = relayerUrlFirst, fake = false) {
   console.log('Making a withdraw...')
   const withdraw: IWithdrawData = {
     fee: '0',
@@ -171,6 +170,6 @@ export async function withdraw(account: UserAccount, to: Uint8Array, amount: str
     energy_amount,
   }
   const mergeTx = await account.createWithdraw(withdraw)
-  await proofAndSend(mergeTx, fake, '02', null)
+  await proofAndSend(mergeTx, fake, '02', null, relayerUrl)
   return mergeTx
 }

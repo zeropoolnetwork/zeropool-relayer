@@ -7,7 +7,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { txQueue } from './services/jobQueue'
 import { OUTPLUSONE } from './utils/constants'
-import { getEvents, getTransaction } from './utils/web3'
+import { getEvents, getTransaction, getChainId } from './utils/web3'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { RelayerKeys, updateField } from './utils/redisFields'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix, TxType } from './utils/helpers'
@@ -31,23 +31,29 @@ import txVK from './transfer_verification_key.json'
 class Pool {
   public PoolInstance: Contract
   private treeParams: Params
-  private txParams: Params
   private txVK: VK
   public tree: MerkleTree
   public txs: TxStorage
+  public chainId: number = 0
+  public isInitialized = false
 
   constructor() {
     this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
 
     this.treeParams = Params.fromFile('./tree_params.bin')
-    this.txParams = Params.fromFile('./transfer_params.bin')
 
     this.txVK = txVK
 
     this.tree = new MerkleTree('./tree.db')
     this.txs = new TxStorage('./txs.db')
 
-    this.syncState()
+    this.init()
+  }
+
+  async init() {
+    this.chainId = await getChainId(web3)
+    await this.syncState()
+    this.isInitialized = true
   }
 
   async transact(txProof: Proof, rawMemo: string, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
@@ -104,7 +110,7 @@ class Pool {
       treePub,
       treeSec
     )
-    logger.debug('proved')
+    logger.debug('Tree proved')
 
     return {
       proof,
@@ -126,6 +132,7 @@ class Pool {
   }
 
   async syncState(fromBlock: number | string = 'earliest') {
+    logger.debug('Syncing state...')
     const contractRoot = await this.getContractMerkleRoot(null)
     let localRoot = this.getLocalMerkleRoot()
     logger.debug(`LATEST CONTRACT ROOT ${contractRoot}`)
@@ -155,7 +162,7 @@ class Pool {
 
         const { input } = await getTransaction(web3, transactionHash)
         const calldata = Buffer.from(truncateHexPrefix(input), 'hex')
-        
+
         const parser = new PoolCalldataParser(calldata)
 
         const outCommitRaw = parser.getField('outCommit')
@@ -166,7 +173,7 @@ class Pool {
 
         const memoSize = web3.utils.hexToNumber(parser.getField('memoSize'))
         const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
-        
+
         const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
         const commitAndMemo = numToHex(outCommit).concat(truncatedMemo)
 
@@ -179,10 +186,6 @@ class Pool {
       localRoot = this.getLocalMerkleRoot()
       logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
     }
-  }
-
-  getTxProof(pub: TransferPub, sec: TransferSec) {
-    return Proof.tx(this.txParams, pub, sec)
   }
 
   getTreeProof(pub: TreePub, sec: TreeSec): Proof {
@@ -215,7 +218,8 @@ class Pool {
     return this.tree.getProof(noteIndex)
   }
 
-  getTransactions(limit: number, offset: number) {
+  async getTransactions(limit: number, offset: number) {
+    await this.syncState()
     const txs: (Buffer | null)[] = new Array(limit)
     offset = Math.ceil(offset / OUTPLUSONE)
     for (let i = 0; i < limit; i++) {

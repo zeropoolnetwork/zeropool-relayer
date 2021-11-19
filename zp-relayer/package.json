@@ -7,7 +7,7 @@
     "initialize": "git submodule update --init && yarn install --unsafe-perm --frozen-lockfile && yarn build:libzeropool-rs-node && yarn build:libzeropool-rs-wasm",
     "build": "tsc --project ./",
     "start:dev": "ts-node index.ts",
-    "start:prod": "node build/index.js",
+    "start:prod": "node index.js",
     "test": "ts-mocha --timeout 1000000 test/**/*.test.ts"
   },
   "dependencies": {

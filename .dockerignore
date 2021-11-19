@@ -2,10 +2,10 @@
 **/package-lock.json
 **/target
 **/.git
+**/.env*
 build
 tree.db
 txs.db
 dist
-.env*
 test
 test-e2e

@@ -1,4 +1,5 @@
 import fs from 'fs'
+import childProcess from 'child_process'
 import { Request, Response } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
@@ -17,9 +18,13 @@ const txProof = (() => {
       fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
       txProofNum += 1
     }
-    const proof = pool.getTxProof(pub, sec)
-    logger.debug('Tx proved')
-    res.json(proof)
+
+    const child = childProcess.fork('./prover.js')
+    child.send({ pub, sec })
+    child.on('message', p => {
+      logger.debug('Tx proved')
+      res.json(p)
+    })
   }
 })()
 
@@ -35,10 +40,10 @@ async function merkleRoot(req: Request, res: Response) {
   res.json(root)
 }
 
-function getTransactions(req: Request, res: Response) {
+async function getTransactions(req: Request, res: Response) {
   const limit = parseInt(req.params.limit)
   const offset = parseInt(req.params.offset)
-  const txs = pool.getTransactions(limit, offset)
+  const txs = await pool.getTransactions(limit, offset)
   res.json(txs)
 }
 

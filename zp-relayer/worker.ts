@@ -120,6 +120,8 @@ async function processTx(job: Job<TxPayload>) {
 
   const logPrefix = `Job ${jobId}:`
 
+  await pool.syncState()
+
   checkAssertion(
     () => checkFeeAndNativeAmount(rawMemo, txType),
     `${logPrefix} Fee too low`
@@ -150,7 +152,7 @@ async function processTx(job: Job<TxPayload>) {
     depositSignature
   )
 
-  const nonce = Number(await readNonce())
+  const nonce = Number(await readNonce(true))
   const txHash = await signAndSend(
     RELAYER_ADDRESS_PRIVATE_KEY,
     data,
@@ -161,7 +163,7 @@ async function processTx(job: Job<TxPayload>) {
     // TODO gas
     gas,
     to,
-    await web3.eth.getChainId(),
+    pool.chainId,
     web3
   )
   logger.debug(`${logPrefix} TX hash ${txHash}`)

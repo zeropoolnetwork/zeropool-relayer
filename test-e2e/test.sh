@@ -1,24 +1,36 @@
 #!/usr/bin/env bash
 
+set -e
+
 trap cleanup EXIT
+
+FILE=docker-compose.test.yml
 
 cleanup() {
   [[ ! -z "$http_server_pid" ]] && kill $http_server_pid
-  docker-compose rm -s -f relayer
-  docker-compose down -v
+  docker-compose -f $FILE rm -s -f relayer1
+  docker-compose -f $FILE rm -s -f relayer2
+  docker-compose -f $FILE down -v
 }
 cleanup
 
-cd ..
-echo "Deploying contracts..."
-./scripts/deploy.sh &>/dev/null &
-sleep 15
-echo "Starting relayer..."
-docker-compose run -e RPC_URL=http://ganache:8545 -e RELAYER_REDIS_URL=redis:6379 -p 8000:8000 relayer &
-cd -
+echo "Starting our own ganache instance"
+docker-compose -f $FILE up ganache &
+sleep 5
+echo "Deploy ZP contracts"
+docker-compose -f $FILE up contracts
 
-echo "Staring redis..."
-docker-compose up redis &>/dev/null &
+echo "Staring redis1..."
+docker-compose -f $FILE up redis1 &
+
+echo "Staring redis2..."
+docker-compose -f $FILE up redis2 &
+
+echo "Starting relayer1..."
+docker-compose -f $FILE up relayer1 &
+
+echo "Starting relayer2..."
+docker-compose -f $FILE up relayer2 &
 
 echo "Starting file server..."
 npx http-server .. &>/dev/null &

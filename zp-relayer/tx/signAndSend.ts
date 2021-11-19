@@ -29,7 +29,7 @@ export async function signAndSend(
   return new Promise((res, rej) =>
     web3.eth
       .sendSignedTransaction(serializedTx.rawTransaction as string)
-      .on('transactionHash', res)
+      .once('transactionHash', res)
       .once('error', rej)
   )
 }
