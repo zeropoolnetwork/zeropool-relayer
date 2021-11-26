@@ -9,3 +9,4 @@ txs.db
 dist
 test
 test-e2e
+*_key.json

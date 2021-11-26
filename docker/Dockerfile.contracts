@@ -1,7 +1,7 @@
 ARG VERIFIER_IMAGE
 FROM $VERIFIER_IMAGE as verifier
 
-FROM node:12
+FROM node:16
 
 WORKDIR /app
 
