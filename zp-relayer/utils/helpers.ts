@@ -1,12 +1,7 @@
 import { numberToHex, padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
 import { SnarkProof } from 'libzeropool-rs-node'
-
-export enum TxType {
-  DEPOSIT = '00',
-  TRANSFER = '01',
-  WITHDRAWAL = '02',
-}
+import { TxType } from 'zp-memo-parser'
 
 export function toTxType(t: string): TxType {
   t = truncateHexPrefix(t)

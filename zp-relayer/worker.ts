@@ -7,11 +7,11 @@ import { redis } from './services/redisClient'
 import { TxPayload } from './services/jobQueue'
 import { TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
 import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
-import { TxType, numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
+import { numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
 import { Helpers, Proof } from 'libzeropool-rs-node'
 import { pool } from './pool'
-import { getTxData } from 'zp-memo-parser'
+import { getTxData, TxType } from 'zp-memo-parser'
 import { config } from './config/config'
 
 const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[])
@@ -22,11 +22,12 @@ const {
 
 
 function parseDelta(delta: string) {
-  const { index, e, v } = Helpers.parseDelta(delta)
+  const { poolId, index, e, v } = Helpers.parseDelta(delta)
   return {
     transferIndex: numToHex(index, 12),
-    energyAmount: numToHex(e, 16),
+    energyAmount: numToHex(e, 28),
     tokenAmount: numToHex(v, 16),
+    poolId: numToHex(poolId, 6),
   }
 }
 
@@ -71,7 +72,7 @@ function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: str
   const {
     transferIndex,
     energyAmount,
-    tokenAmount
+    tokenAmount,
   } = parseDelta(txProof.inputs[3])
   logger.debug(`DELTA ${transferIndex} ${energyAmount} ${tokenAmount}`)
 
@@ -122,6 +123,7 @@ async function processTx(job: Job<TxPayload>) {
 
   await pool.syncState()
 
+  logger.info(`${logPrefix} Recieved ${txType} tx with ${amount} native amount`)
   checkAssertion(
     () => checkFeeAndNativeAmount(rawMemo, txType),
     `${logPrefix} Fee too low`

@@ -4,6 +4,6 @@ WORKDIR /app
 
 RUN cargo install --git https://github.com/zeropoolnetwork/libzeropool && \
     libzeropool-setup setup -c tree_update -p tree_params.bin -v tree_vk.json && \
-    libzeropool-setup generate-verifier -s TreeVerifier.sol -n TreeVerifier -v tree_vk.json && \
+    libzeropool-setup generate-verifier -s TreeUpdateVerifier.sol -n TreeUpdateVerifier -v tree_vk.json && \
     libzeropool-setup setup -c transfer -p tx_params.bin -v tx_vk.json && \
     libzeropool-setup generate-verifier -s TransferVerifier.sol -n TransferVerifier -v tx_vk.json

@@ -145,7 +145,7 @@ export async function deposit(account: UserAccount, from: string, amount: string
     numToHex(web3, mergeTx.public.nullifier),
     clientPK
   )
-  await proofAndSend(mergeTx, fake, '00', packSignature(depositSignature), relayerUrl)
+  await proofAndSend(mergeTx, fake, '0000', packSignature(depositSignature), relayerUrl)
   return mergeTx
 }
 
@@ -156,7 +156,7 @@ export async function transfer(account: UserAccount, to: string, amount: string,
     outputs: [{ to, amount }]
   }
   const mergeTx = await account.createTransfer(transfer)
-  await proofAndSend(mergeTx, fake, '01', null, relayerUrl)
+  await proofAndSend(mergeTx, fake, '0001', null, relayerUrl)
   return mergeTx
 }
 
@@ -170,6 +170,6 @@ export async function withdraw(account: UserAccount, to: Uint8Array, amount: str
     energy_amount,
   }
   const mergeTx = await account.createWithdraw(withdraw)
-  await proofAndSend(mergeTx, fake, '02', null, relayerUrl)
+  await proofAndSend(mergeTx, fake, '0002', null, relayerUrl)
   return mergeTx
 }

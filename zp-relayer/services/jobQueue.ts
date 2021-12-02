@@ -1,8 +1,8 @@
 import { Queue } from 'bullmq'
 import { redis } from './redisClient'
 import { TX_QUEUE_NAME } from '../utils/constants'
-import { TxType } from '../utils/helpers'
 import { Proof } from 'libzeropool-rs-node'
+import { TxType } from 'zp-memo-parser'
 
 export interface TxPayload {
   to: string

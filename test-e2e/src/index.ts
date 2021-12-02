@@ -107,7 +107,7 @@ describe('ZP client', () => {
       expect(energyDiff).bignumber.eq(denominator.mul(toBN(555)))
     })
 
-    it('can deposit-transfer-withdraw', async () => {
+    it('can deposit-transfer-withdraw with one relayer', async () => {
       const account = await createAccount([7, 8, 9], '789')
       const accountOther = await createAccount([10, 11, 12], '101112')
 

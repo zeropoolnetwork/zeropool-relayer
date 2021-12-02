@@ -15,9 +15,9 @@ export class PoolCalldataParser {
     selector: { start: 0, size: 4 },
     nullifier: { start: 4, size: 32 },
     outCommit: { start: 36, size: 32 },
-    txType: { start: 634, size: 1 },
-    memoSize: { start: 635, size: 2 },
-    memo: { start: 637, size: 0 },
+    txType: { start: 640, size: 2 },
+    memoSize: { start: 642, size: 2 },
+    memo: { start: 644, size: 0 },
   }
   constructor(private calldata: Buffer) { }
 

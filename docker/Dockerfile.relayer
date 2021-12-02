@@ -53,6 +53,4 @@ COPY --from=build /app/zp-relayer/build ./
 COPY --from=verifier /app/tree_params.bin ./
 COPY --from=verifier /app/tx_params.bin ./transfer_params.bin
 
-EXPOSE 80
-
 CMD yarn workspace zp-relayer run start:prod

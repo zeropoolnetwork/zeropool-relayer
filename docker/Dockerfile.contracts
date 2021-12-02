@@ -11,7 +11,7 @@ RUN npm install
 
 COPY ./pool-evm-single-l1/ ./
 
-COPY --from=verifier /app/TreeVerifier.sol /app/contracts/
+COPY --from=verifier /app/TreeUpdateVerifier.sol /app/contracts/
 COPY --from=verifier /app/TransferVerifier.sol /app/contracts/
 
 RUN npx hardhat compile

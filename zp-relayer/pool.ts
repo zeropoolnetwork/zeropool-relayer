@@ -10,7 +10,7 @@ import { OUTPLUSONE } from './utils/constants'
 import { getEvents, getTransaction, getChainId } from './utils/web3'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { RelayerKeys, updateField } from './utils/redisFields'
-import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix, TxType } from './utils/helpers'
+import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import {
   Params,
   TreePub,
@@ -19,14 +19,13 @@ import {
   MerkleTree,
   TxStorage,
   MerkleProof,
-  TransferPub,
-  TransferSec,
   Constants,
   SnarkProof,
   VK,
   Helpers,
 } from 'libzeropool-rs-node'
 import txVK from './transfer_verification_key.json'
+import { TxType } from 'zp-memo-parser'
 
 class Pool {
   public PoolInstance: Contract
@@ -197,13 +196,13 @@ class Pool {
   }
 
   async getContractTransferNum() {
-    const transferNum = await pool.PoolInstance.methods.transfer_num().call()
+    const transferNum = await pool.PoolInstance.methods.pool_index().call()
     return Number(transferNum)
   }
 
   async getContractMerkleRoot(index: string | undefined | null): Promise<string> {
     if (!index) {
-      index = await this.PoolInstance.methods.transfer_num().call()
+      index = await this.PoolInstance.methods.pool_index().call()
     }
     const root = await this.PoolInstance.methods.roots(index).call()
     return root.toString()

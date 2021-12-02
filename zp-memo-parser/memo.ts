@@ -5,15 +5,15 @@ import { toBN } from 'web3-utils'
 type Option<T> = T | null
 
 export enum TxType {
-  DEPOSIT = '00',
-  TRANSFER = '01',
-  WITHDRAWAL = '02',
+  DEPOSIT = '0000',
+  TRANSFER = '0001',
+  WITHDRAWAL = '0002',
 }
 
 // Size in bytes
 const U256_SIZE = 32
 const POLY_1305_TAG_SIZE = 16
-const ACCOUNT_SIZE = 64
+const ACCOUNT_SIZE = 70
 const NOTE_SIZE = 60
 const ZERO_NOTE_HASH = Uint8Array.from([205, 67, 21, 69, 218, 80, 86, 210, 193, 254, 80, 77, 140, 200, 120, 159, 225, 78, 91, 230, 207, 158, 63, 231, 197, 180, 251, 16, 82, 219, 170, 14])
 
