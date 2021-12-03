@@ -10,3 +10,4 @@ dist
 test
 test-e2e
 *_key.json
+**/params/

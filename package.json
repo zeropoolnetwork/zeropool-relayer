@@ -13,7 +13,7 @@
     "test-e2e"
   ],
   "scripts": {
-    "initialize": "yarn clean && git submodule update --init && yarn install --unsafe-perm --frozen-lockfile && yarn build:libzeropool-rs-node && yarn build:libzeropool-rs-wasm",
+    "initialize": "git submodule update --init && yarn install --unsafe-perm --frozen-lockfile && yarn build:libzeropool-rs-node && yarn build:libzeropool-rs-wasm",
     "build:relayer": "yarn workspace zp-relayer run build",
     "build:memo": "yarn workspace zp-memo-parser run build",
     "build:libzeropool-rs-node": "npm --prefix libzeropool-rs/libzeropool-rs-node run build",

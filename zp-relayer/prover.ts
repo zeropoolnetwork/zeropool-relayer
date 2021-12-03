@@ -3,7 +3,7 @@ import {
   Proof,
 } from 'libzeropool-rs-node'
 
-const txParams = Params.fromFile('./transfer_params.bin')
+const txParams = Params.fromFile('./params/transfer_params.bin')
 
 process.on('message', ({ pub, sec }) => {
   const proof = Proof.tx(txParams, pub, sec)

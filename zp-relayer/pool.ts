@@ -24,7 +24,7 @@ import {
   VK,
   Helpers,
 } from 'libzeropool-rs-node'
-import txVK from './transfer_verification_key.json'
+import txVK from './params/transfer_verification_key.json'
 import { TxType } from 'zp-memo-parser'
 
 class Pool {
@@ -39,7 +39,7 @@ class Pool {
   constructor() {
     this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
 
-    this.treeParams = Params.fromFile('./tree_params.bin')
+    this.treeParams = Params.fromFile('./params/tree_params.bin')
 
     this.txVK = txVK
 

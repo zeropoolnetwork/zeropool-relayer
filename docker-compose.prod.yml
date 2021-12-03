@@ -24,6 +24,7 @@ services:
     image: lok52/zp-relayer:latest
     env_file: zp-relayer/.env
     volumes:
+      - $PARAMS_PATH:/app/params
       - relayer_tree:/app/tree.db
       - relayer_txs:/app/txs.db
     depends_on:
