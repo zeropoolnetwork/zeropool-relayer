@@ -30,12 +30,16 @@ services:
   relayer1:
     image: lok52/zp-relayer:latest
     container_name: relayer1
+    volumes:
+      - $PARAMS_PATH:/app/zp-relayer/params/
     ports:
       - 8000:8000
     env_file: ./relayer1.env
   relayer2:
     image: lok52/zp-relayer:latest
     container_name: relayer2
+    volumes:
+      - $PARAMS_PATH:/app/zp-relayer/params/
     ports:
       - 8001:8001
     env_file: ./relayer2.env

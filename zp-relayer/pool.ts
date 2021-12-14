@@ -1,6 +1,7 @@
 import './env'
+import BN from 'bn.js'
 import PoolAbi from './abi/pool-abi.json'
-import { AbiItem } from 'web3-utils'
+import { AbiItem, toBN } from 'web3-utils'
 import { Contract } from 'web3-eth-contract'
 import { config } from './config/config'
 import { web3 } from './services/web3'
@@ -24,7 +25,6 @@ import {
   VK,
   Helpers,
 } from 'libzeropool-rs-node'
-import txVK from './params/transfer_verification_key.json'
 import { TxType } from 'zp-memo-parser'
 
 class Pool {
@@ -34,6 +34,7 @@ class Pool {
   public tree: MerkleTree
   public txs: TxStorage
   public chainId: number = 0
+  public denominator: BN = toBN(1)
   public isInitialized = false
 
   constructor() {
@@ -41,16 +42,16 @@ class Pool {
 
     this.treeParams = Params.fromFile('./params/tree_params.bin')
 
+    const txVK = require('./params/transfer_verification_key.json')
     this.txVK = txVK
 
     this.tree = new MerkleTree('./tree.db')
     this.txs = new TxStorage('./txs.db')
-
-    this.init()
   }
 
   async init() {
     this.chainId = await getChainId(web3)
+    this.denominator = toBN(await this.PoolInstance.methods.denominator().call())
     await this.syncState()
     this.isInitialized = true
   }
@@ -174,7 +175,7 @@ class Pool {
         const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
 
         const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-        const commitAndMemo = numToHex(outCommit).concat(truncatedMemo)
+        const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
 
         this.addCommitment(txNum, Helpers.strToNum(outCommit))
         pool.txs.add(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))

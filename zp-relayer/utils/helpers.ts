@@ -1,3 +1,4 @@
+import BN from 'bn.js'
 import { numberToHex, padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
 import { SnarkProof } from 'libzeropool-rs-node'
@@ -29,8 +30,7 @@ export function truncateHexPrefix(data: string) {
   return data
 }
 
-export function numToHex(n: string, pad = 64) {
-  let num = toBN(n)
+export function numToHex(num: BN, pad = 64) {
   if (num.isNeg()) {
     let a = toBN(2).pow(toBN(pad * 4))
     num = a.sub(num.neg())
@@ -44,7 +44,7 @@ export function numToHex(n: string, pad = 64) {
 
 export function flattenProof(p: SnarkProof): string {
   return [p.a, p.b.flat(), p.c].flat().map(n => {
-    const hex = numToHex(n)
+    const hex = numToHex(toBN(n))
     return hex
   }).join('')
 }

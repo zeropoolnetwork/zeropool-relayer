@@ -131,10 +131,29 @@ export async function createAccount(sk: number[], stateId: string) {
   return account
 }
 
+async function signAndSend(to: string, data: string) {
+  const serializedTx = await web3.eth.accounts.signTransaction(
+    {
+      to,
+      data,
+      gas: '1000000'
+    },
+    clientPK
+  )
+
+  return new Promise((res, rej) =>
+    web3.eth
+      .sendSignedTransaction(serializedTx.rawTransaction as string)
+      .once('transactionHash', res)
+      .once('error', rej)
+  )
+}
+
 export async function deposit(account: UserAccount, from: string, amount: string, relayerUrl = relayerUrlFirst, fake = false) {
   const amounBN = toBN(amount)
   console.log('Approving tokens...')
-  await token.methods.approve(zpAddress, amounBN.mul(denominator)).send({ from })
+  const data = token.methods.approve(zpAddress, amounBN.mul(denominator)).encodeABI()
+  await signAndSend(tokenAddress, data)
   console.log('Making a deposit...')
   const deposit: IDepositData = {
     fee: '0',

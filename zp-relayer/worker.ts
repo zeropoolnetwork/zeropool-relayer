@@ -1,3 +1,4 @@
+import BN from 'bn.js'
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
 import { Job, Worker } from 'bullmq'
@@ -5,11 +6,11 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
 import { TxPayload } from './services/jobQueue'
-import { TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
+import { TX_QUEUE_NAME, OUTPLUSONE, TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE } from './utils/constants'
 import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
-import { Helpers, Proof } from 'libzeropool-rs-node'
+import { Helpers, Proof, SnarkProof } from 'libzeropool-rs-node'
 import { pool } from './pool'
 import { getTxData, TxType } from 'zp-memo-parser'
 import { config } from './config/config'
@@ -18,17 +19,16 @@ const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[])
 
 const {
   RELAYER_ADDRESS_PRIVATE_KEY,
+  GAS_PRICE,
 } = process.env as Record<PropertyKey, string>
 
+const ZERO = toBN(0)
 
-function parseDelta(delta: string) {
-  const { poolId, index, e, v } = Helpers.parseDelta(delta)
-  return {
-    transferIndex: numToHex(index, 12),
-    energyAmount: numToHex(e, 28),
-    tokenAmount: numToHex(v, 16),
-    poolId: numToHex(poolId, 6),
-  }
+interface Delta {
+  transferIndex: BN
+  energyAmount: BN
+  tokenAmount: BN
+  poolId: BN
 }
 
 function checkCommitment(treeProof: Proof, txProof: Proof) {
@@ -39,9 +39,50 @@ function checkTxProof(txProof: Proof) {
   return pool.verifyProof(txProof.proof, txProof.inputs)
 }
 
-function checkFeeAndNativeAmount(memo: string, txType: TxType) {
-  const buf = Buffer.from(memo, 'hex')
-  const { fee, nativeAmount } = getTxData(buf, txType)
+async function checkNullifier(nullifier: string) {
+  const exists = await pool.PoolInstance.methods.nullifiers(nullifier).call()
+  return toBN(exists).eq(ZERO)
+}
+
+function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
+  return transferIndex.lte(contractPoolIndex)
+}
+
+function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, nativeAmount: BN | null, msgValue: BN) {
+  logger.debug(`TOKENS ${tokenAmount.toString()}, ENERGY ${energyAmount.toString()}, MEMO NATIVE ${nativeAmount?.toString()}, MSG VALUE ${msgValue.toString()}`)
+  let isValid = false
+  if (txType === TxType.DEPOSIT) {
+    isValid =
+      tokenAmount.gte(ZERO) &&
+      energyAmount.eq(ZERO) &&
+      msgValue.eq(ZERO)
+  } else if (txType === TxType.TRANSFER) {
+    isValid =
+      tokenAmount.eq(ZERO) &&
+      energyAmount.eq(ZERO) &&
+      msgValue.eq(ZERO)
+  } else if (txType === TxType.WITHDRAWAL) {
+    isValid =
+      tokenAmount.lte(ZERO) &&
+      energyAmount.lte(ZERO)
+    if (nativeAmount)
+      isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
+  }
+  return isValid
+}
+
+
+function parseDelta(delta: string): Delta {
+  const { poolId, index, e, v } = Helpers.parseDelta(delta)
+  return {
+    transferIndex: toBN(index),
+    energyAmount: toBN(e),
+    tokenAmount: toBN(v),
+    poolId: toBN(poolId),
+  }
+}
+
+function checkFeeAndNativeAmount(fee: BN, nativeAmount: BN | null) {
   logger.debug(`Fee: ${fee}`)
   logger.debug(`Native amount: ${nativeAmount}`)
   // Check native amount (relayer faucet)
@@ -55,34 +96,38 @@ function checkFeeAndNativeAmount(memo: string, txType: TxType) {
   return true
 }
 
-function checkAssertion(f: Function, errStr: string) {
-  if (!f()) {
+async function checkAssertion(f: Function, errStr: string) {
+  const res = await f()
+  if (!res) {
     logger.error(errStr)
     throw new Error(errStr)
   }
 }
 
-function buildTxData(txProof: Proof, treeProof: Proof, txType: TxType, memo: string, depositSignature: string | null) {
+function buildTxData(
+  txProof: SnarkProof,
+  treeProof: SnarkProof,
+  nullifier: string,
+  outCommit: string,
+  delta: Delta,
+  rootAfter: string,
+  txType: TxType,
+  memo: string,
+  depositSignature: string | null
+) {
 
   const selector: string = PoolInstance.methods.transact().encodeABI()
 
-  const nullifier = numToHex(txProof.inputs[1])
-  const outCommit = numToHex(treeProof.inputs[2])
-
-  const {
-    transferIndex,
-    energyAmount,
-    tokenAmount,
-  } = parseDelta(txProof.inputs[3])
+  const transferIndex = numToHex(delta.transferIndex, TRANSFER_INDEX_SIZE)
+  const energyAmount = numToHex(delta.energyAmount, ENERGY_SIZE)
+  const tokenAmount = numToHex(delta.tokenAmount, TOKEN_SIZE)
   logger.debug(`DELTA ${transferIndex} ${energyAmount} ${tokenAmount}`)
 
-  const txFlatProof = flattenProof(txProof.proof)
-
-  const rootAfter = numToHex(treeProof.inputs[1])
-  const treeFlatProof = flattenProof(treeProof.proof)
+  const txFlatProof = flattenProof(txProof)
+  const treeFlatProof = flattenProof(treeProof)
 
   const memoMessage = memo
-  const memoSize = numToHex((memoMessage.length / 2).toString(), 4)
+  const memoSize = numToHex(toBN(memoMessage.length).divn(2), 4)
 
   const data = [
     selector,
@@ -124,31 +169,62 @@ async function processTx(job: Job<TxPayload>) {
   await pool.syncState()
 
   logger.info(`${logPrefix} Recieved ${txType} tx with ${amount} native amount`)
-  checkAssertion(
-    () => checkFeeAndNativeAmount(rawMemo, txType),
+
+  await checkAssertion(
+    () => checkNullifier(txProof.inputs[1]),
+    `${logPrefix} Doublespend detected`
+  )
+
+  const buf = Buffer.from(rawMemo, 'hex')
+  const { fee, nativeAmount } = getTxData(buf, txType)
+
+  await checkAssertion(
+    () => checkFeeAndNativeAmount(fee, nativeAmount),
     `${logPrefix} Fee too low`
   )
 
-  checkAssertion(
+  await checkAssertion(
     () => checkTxProof(txProof),
     `${logPrefix} Incorrect transfer proof`
   )
 
+  const contractTransferIndex = Number(await readTransferNum())
+  const delta = parseDelta(txProof.inputs[3])
+
+  await checkAssertion(
+    () => checkTransferIndex(toBN(contractTransferIndex), delta.transferIndex),
+    `${logPrefix} Incorrect transfer index`
+  )
+
+  await checkAssertion(
+    () => checkTxSpecificFields(
+      txType,
+      delta.tokenAmount,
+      delta.energyAmount,
+      nativeAmount,
+      toBN(amount)
+    ),
+    `${logPrefix} Tx specific fields are incorrect`
+  )
+
   const outCommit = txProof.inputs[2]
-  const transferNum = Number(await readTransferNum())
   const {
     proof: treeProof,
     nextCommitIndex
-  } = pool.getVirtualTreeProof(outCommit, transferNum)
+  } = pool.getVirtualTreeProof(outCommit, contractTransferIndex)
 
-  checkAssertion(
+  await checkAssertion(
     () => checkCommitment(treeProof, txProof),
     `${logPrefix} Commmitment mismatch`
   )
 
   const data = buildTxData(
-    txProof,
-    treeProof,
+    txProof.proof,
+    treeProof.proof,
+    numToHex(toBN(txProof.inputs[1])),
+    numToHex(toBN(treeProof.inputs[2])),
+    delta,
+    numToHex(toBN(treeProof.inputs[1])),
     txType,
     rawMemo,
     depositSignature
@@ -159,10 +235,8 @@ async function processTx(job: Job<TxPayload>) {
     RELAYER_ADDRESS_PRIVATE_KEY,
     data,
     nonce,
-    // TODO gasPrice
-    '',
+    GAS_PRICE,
     toBN(amount),
-    // TODO gas
     gas,
     to,
     pool.chainId,
@@ -171,16 +245,16 @@ async function processTx(job: Job<TxPayload>) {
   logger.debug(`${logPrefix} TX hash ${txHash}`)
 
   await updateField(RelayerKeys.NONCE, nonce + 1)
-  await updateField(RelayerKeys.TRANSFER_NUM, transferNum + OUTPLUSONE)
+  await updateField(RelayerKeys.TRANSFER_NUM, contractTransferIndex + OUTPLUSONE)
 
   const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
-  const commitAndMemo = numToHex(outCommit).concat(truncatedMemo)
+  const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
 
   logger.debug(`${logPrefix} Updating tree`)
   pool.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
 
   logger.debug(`${logPrefix} Adding tx to storage`)
-  pool.txs.add(transferNum, Buffer.from(commitAndMemo, 'hex'))
+  pool.txs.add(contractTransferIndex, Buffer.from(commitAndMemo, 'hex'))
 
   return txHash
 }
@@ -190,6 +264,8 @@ export async function createTxWorker() {
   // Reset nonce
   const nonce = Number(await readNonce(true))
   await updateField(RelayerKeys.NONCE, nonce + 1)
+
+  await pool.init()
 
   const worker = new Worker<TxPayload>(
     TX_QUEUE_NAME,
