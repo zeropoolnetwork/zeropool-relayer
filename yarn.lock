@@ -3341,9 +3341,10 @@ latest-version@^5.1.0:
   dependencies:
     package-json "^6.3.0"
 
-"libzeropool-rs-node@link:libzeropool-rs/libzeropool-rs-node":
-  version "0.0.0"
-  uid ""
+libzeropool-rs-node@0.1.12:
+  version "0.1.12"
+  resolved "https://registry.yarnpkg.com/libzeropool-rs-node/-/libzeropool-rs-node-0.1.12.tgz#b20d1f46e52e6a357265eb914e2abd3abf85126d"
+  integrity sha512-kztj0EI/3ZhPcKuztxv6bzfXTWbeYKxnJVKyvr+PQ5m5KQisC2AXCjMlGAgtPLGdcEjBmt472G6feg989//amg==
 
 "libzeropool-rs-wasm-bundler@link:libzeropool-rs/libzeropool-rs-wasm/bundler":
   version "0.0.0"
