@@ -1165,6 +1165,11 @@ caniuse-lite@^1.0.30001261:
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001261.tgz#96d89813c076ea061209a4e040d8dcf0c66a1d01"
   integrity sha512-vM8D9Uvp7bHIN0fZ2KQ4wnmYFpJo/Etb4Vwsuc+ka0tfGDHvOPrFm6S/7CCNLSOkAUjenT2HnUPESdOIL91FaA==
 
+cargo-cp-artifact@^0.1:
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/cargo-cp-artifact/-/cargo-cp-artifact-0.1.6.tgz#df1bc9dad036ae0f4230639a869182e1d5850f89"
+  integrity sha512-CQw0doK/aaF7j041666XzuilHxqMxaKkn+I5vmBsd8SAwS0cO5CqVEVp0xJwOKstyqWZ6WK4Ww3O6p26x/Goyg==
+
 caseless@~0.12.0:
   version "0.12.0"
   resolved "https://registry.yarnpkg.com/caseless/-/caseless-0.12.0.tgz#1b681c21ff84033c826543090689420d187151dc"
@@ -3341,10 +3346,12 @@ latest-version@^5.1.0:
   dependencies:
     package-json "^6.3.0"
 
-libzeropool-rs-node@0.1.12:
-  version "0.1.12"
-  resolved "https://registry.yarnpkg.com/libzeropool-rs-node/-/libzeropool-rs-node-0.1.12.tgz#b20d1f46e52e6a357265eb914e2abd3abf85126d"
-  integrity sha512-kztj0EI/3ZhPcKuztxv6bzfXTWbeYKxnJVKyvr+PQ5m5KQisC2AXCjMlGAgtPLGdcEjBmt472G6feg989//amg==
+libzeropool-rs-node@^0.1.19:
+  version "0.1.19"
+  resolved "https://registry.yarnpkg.com/libzeropool-rs-node/-/libzeropool-rs-node-0.1.19.tgz#4160f7dd5b31850ebf7c143c7139401bdb118339"
+  integrity sha512-w1dm2v8BSfApXO9ORxO0QUKEvU8GDhU5Lf+GGjbO1kP8SYDaZj+i3mNjo0NOygEhKetFDXCPs3ihEofCicbYKw==
+  dependencies:
+    cargo-cp-artifact "^0.1"
 
 "libzeropool-rs-wasm-bundler@link:libzeropool-rs/libzeropool-rs-wasm/bundler":
   version "0.0.0"
