@@ -1,9 +1,15 @@
 ARG VERIFIER_IMAGE
 FROM $VERIFIER_IMAGE as verifier
 
-FROM node:16 as base
+FROM rust:1.57.0-slim-buster as base
 
 WORKDIR /app
+
+RUN apt-get update && \
+    apt-get -y install curl && \
+    curl -sL https://deb.nodesource.com/setup_16.x | bash && \
+    apt-get -y install nodejs libclang-dev clang && \
+    npm install -g yarn cargo-cp-artifact
 
 COPY --from=verifier /app/tx_vk.json /app/zp-relayer/transfer_verification_key.json
 
@@ -26,12 +32,15 @@ COPY zp-relayer ./zp-relayer
 RUN yarn build:relayer
 
 
-FROM base
+FROM node:16
 
 WORKDIR /app/zp-relayer
 
 COPY --from=build /app/zp-relayer/build ./
+COPY --from=build /app/zp-relayer/package.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/zp-memo-parser ./node_modules/zp-memo-parser
 COPY --from=verifier /app/tree_params.bin ./
 COPY --from=verifier /app/tx_params.bin ./transfer_params.bin
 
-CMD yarn workspace zp-relayer run start:prod
+CMD yarn run start:prod
