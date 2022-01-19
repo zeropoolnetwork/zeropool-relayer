@@ -1165,6 +1165,11 @@ caniuse-lite@^1.0.30001261:
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001261.tgz#96d89813c076ea061209a4e040d8dcf0c66a1d01"
   integrity sha512-vM8D9Uvp7bHIN0fZ2KQ4wnmYFpJo/Etb4Vwsuc+ka0tfGDHvOPrFm6S/7CCNLSOkAUjenT2HnUPESdOIL91FaA==
 
+cargo-cp-artifact@^0.1:
+  version "0.1.6"
+  resolved "https://registry.yarnpkg.com/cargo-cp-artifact/-/cargo-cp-artifact-0.1.6.tgz#df1bc9dad036ae0f4230639a869182e1d5850f89"
+  integrity sha512-CQw0doK/aaF7j041666XzuilHxqMxaKkn+I5vmBsd8SAwS0cO5CqVEVp0xJwOKstyqWZ6WK4Ww3O6p26x/Goyg==
+
 caseless@~0.12.0:
   version "0.12.0"
   resolved "https://registry.yarnpkg.com/caseless/-/caseless-0.12.0.tgz#1b681c21ff84033c826543090689420d187151dc"
@@ -3341,13 +3346,17 @@ latest-version@^5.1.0:
   dependencies:
     package-json "^6.3.0"
 
-"libzeropool-rs-node@link:libzeropool-rs/libzeropool-rs-node":
-  version "0.0.0"
-  uid ""
+libzeropool-rs-node@^0.1.19:
+  version "0.1.20"
+  resolved "https://registry.yarnpkg.com/libzeropool-rs-node/-/libzeropool-rs-node-0.1.20.tgz#d0af26e20dda01189fcd099111d76d3afc752de6"
+  integrity sha512-BrgDl6AMO29W5XO58QclgF9sOWWvoUom/D0Rkah91RJgyX6IbstqSnC9DVidul7IL0skEIFXr+E2GQiIU4rCbQ==
+  dependencies:
+    cargo-cp-artifact "^0.1"
 
-"libzeropool-rs-wasm-bundler@link:libzeropool-rs/libzeropool-rs-wasm/bundler":
-  version "0.0.0"
-  uid ""
+libzeropool-rs-wasm-bundler@0.3.5:
+  version "0.3.5"
+  resolved "https://registry.yarnpkg.com/libzeropool-rs-wasm-bundler/-/libzeropool-rs-wasm-bundler-0.3.5.tgz#91b4fd0e2a6262ecbfc27329069b40dbf02285ab"
+  integrity sha512-uOxLgSf2WABMZ98B59Dz4GAh5TFtFiqOj4sdsQUtCiE3iJnXDwGxGI7NHF1ISg/W7ygNulopTCaxq1mVCDgr4w==
 
 lighthouse-logger@^1.0.0:
   version "1.3.0"
