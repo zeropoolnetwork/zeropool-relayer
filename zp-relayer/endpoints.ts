@@ -1,6 +1,6 @@
 import fs from 'fs'
 import childProcess from 'child_process'
-import { Request, Response } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
 import { txQueue } from './services/jobQueue'
@@ -28,10 +28,14 @@ const txProof = (() => {
   }
 })()
 
-async function transaction(req: Request, res: Response) {
+async function transaction(req: Request, res: Response, next: NextFunction) {
   const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
-  const jobId = await pool.transact(proof, memo, txType, depositSignature)
-  res.json({ jobId })
+  try {
+    const jobId = await pool.transact(proof, memo, txType, depositSignature)
+    res.json({ jobId })
+  } catch (err) {
+    next(err)
+  }
 }
 
 async function merkleRoot(req: Request, res: Response) {

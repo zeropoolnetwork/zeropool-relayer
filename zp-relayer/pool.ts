@@ -10,7 +10,7 @@ import { txQueue } from './services/jobQueue'
 import { OUTPLUSONE } from './utils/constants'
 import { getEvents, getTransaction, getChainId } from './utils/web3'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
-import { RelayerKeys, updateField } from './utils/redisFields'
+import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import {
   Params,
@@ -25,7 +25,17 @@ import {
   VK,
   Helpers,
 } from 'libzeropool-rs-node'
-import { TxType } from 'zp-memo-parser'
+import {
+  checkAssertion,
+  checkFeeAndNativeAmount,
+  checkNullifier,
+  checkTransferIndex,
+  checkTxProof,
+  checkTxSpecificFields,
+  parseDelta,
+} from './validation'
+
+import { getTxData, TxType } from 'zp-memo-parser'
 
 class Pool {
   public PoolInstance: Contract
@@ -58,6 +68,44 @@ class Pool {
 
   async transact(txProof: Proof, rawMemo: string, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
     logger.debug('Adding tx job to queue')
+
+    await checkAssertion(
+      () => checkNullifier(txProof.inputs[1]),
+      `Doublespend detected`
+    )
+
+    const buf = Buffer.from(rawMemo, 'hex')
+    const { fee, nativeAmount } = getTxData(buf, txType)
+
+    await checkAssertion(
+      () => checkFeeAndNativeAmount(fee, nativeAmount),
+      `Fee too low`
+    )
+
+    await checkAssertion(
+      () => checkTxProof(txProof),
+      `Incorrect transfer proof`
+    )
+
+    const contractTransferIndex = await this.getContractTransferNum()
+    const delta = parseDelta(txProof.inputs[3])
+
+    await checkAssertion(
+      () => checkTransferIndex(toBN(contractTransferIndex), delta.transferIndex),
+      `Incorrect transfer index`
+    )
+
+    await checkAssertion(
+      () => checkTxSpecificFields(
+        txType,
+        delta.tokenAmount,
+        delta.energyAmount,
+        nativeAmount,
+        toBN('0')
+      ),
+      `Tx specific fields are incorrect`
+    )
+
     // TODO maybe store memo in redis as a path to a file
     const job = await txQueue.add('test-tx', {
       to: config.poolAddress,

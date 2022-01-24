@@ -1,4 +1,3 @@
-import BN from 'bn.js'
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
 import { Job, Worker } from 'bullmq'
@@ -10,10 +9,13 @@ import { TX_QUEUE_NAME, OUTPLUSONE, TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE
 import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
-import { Helpers, Proof, SnarkProof } from 'libzeropool-rs-node'
+import { Helpers, SnarkProof } from 'libzeropool-rs-node'
 import { pool } from './pool'
-import { getTxData, TxType } from 'zp-memo-parser'
-import { config } from './config/config'
+import { TxType } from 'zp-memo-parser'
+import {
+  Delta,
+  parseDelta,
+} from './validation'
 
 const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[])
 
@@ -21,88 +23,6 @@ const {
   RELAYER_ADDRESS_PRIVATE_KEY,
   GAS_PRICE,
 } = process.env as Record<PropertyKey, string>
-
-const ZERO = toBN(0)
-
-interface Delta {
-  transferIndex: BN
-  energyAmount: BN
-  tokenAmount: BN
-  poolId: BN
-}
-
-function checkCommitment(treeProof: Proof, txProof: Proof) {
-  return treeProof.inputs[2] === txProof.inputs[2]
-}
-
-function checkTxProof(txProof: Proof) {
-  return pool.verifyProof(txProof.proof, txProof.inputs)
-}
-
-async function checkNullifier(nullifier: string) {
-  const exists = await pool.PoolInstance.methods.nullifiers(nullifier).call()
-  return toBN(exists).eq(ZERO)
-}
-
-function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
-  return transferIndex.lte(contractPoolIndex)
-}
-
-function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, nativeAmount: BN | null, msgValue: BN) {
-  logger.debug(`TOKENS ${tokenAmount.toString()}, ENERGY ${energyAmount.toString()}, MEMO NATIVE ${nativeAmount?.toString()}, MSG VALUE ${msgValue.toString()}`)
-  let isValid = false
-  if (txType === TxType.DEPOSIT) {
-    isValid =
-      tokenAmount.gte(ZERO) &&
-      energyAmount.eq(ZERO) &&
-      msgValue.eq(ZERO)
-  } else if (txType === TxType.TRANSFER) {
-    isValid =
-      tokenAmount.eq(ZERO) &&
-      energyAmount.eq(ZERO) &&
-      msgValue.eq(ZERO)
-  } else if (txType === TxType.WITHDRAWAL) {
-    isValid =
-      tokenAmount.lte(ZERO) &&
-      energyAmount.lte(ZERO)
-    if (nativeAmount)
-      isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
-  }
-  return isValid
-}
-
-
-function parseDelta(delta: string): Delta {
-  const { poolId, index, e, v } = Helpers.parseDelta(delta)
-  return {
-    transferIndex: toBN(index),
-    energyAmount: toBN(e),
-    tokenAmount: toBN(v),
-    poolId: toBN(poolId),
-  }
-}
-
-function checkFeeAndNativeAmount(fee: BN, nativeAmount: BN | null) {
-  logger.debug(`Fee: ${fee}`)
-  logger.debug(`Native amount: ${nativeAmount}`)
-  // Check native amount (relayer faucet)
-  if (nativeAmount && nativeAmount > config.maxFaucet) {
-    return false
-  }
-  // Check user fee
-  if (fee < config.relayerFee) {
-    return false
-  }
-  return true
-}
-
-async function checkAssertion(f: Function, errStr: string) {
-  const res = await f()
-  if (!res) {
-    logger.error(errStr)
-    throw new Error(errStr)
-  }
-}
 
 function buildTxData(
   txProof: SnarkProof,
@@ -170,53 +90,14 @@ async function processTx(job: Job<TxPayload>) {
 
   logger.info(`${logPrefix} Recieved ${txType} tx with ${amount} native amount`)
 
-  await checkAssertion(
-    () => checkNullifier(txProof.inputs[1]),
-    `${logPrefix} Doublespend detected`
-  )
-
-  const buf = Buffer.from(rawMemo, 'hex')
-  const { fee, nativeAmount } = getTxData(buf, txType)
-
-  await checkAssertion(
-    () => checkFeeAndNativeAmount(fee, nativeAmount),
-    `${logPrefix} Fee too low`
-  )
-
-  await checkAssertion(
-    () => checkTxProof(txProof),
-    `${logPrefix} Incorrect transfer proof`
-  )
-
   const contractTransferIndex = Number(await readTransferNum())
   const delta = parseDelta(txProof.inputs[3])
-
-  await checkAssertion(
-    () => checkTransferIndex(toBN(contractTransferIndex), delta.transferIndex),
-    `${logPrefix} Incorrect transfer index`
-  )
-
-  await checkAssertion(
-    () => checkTxSpecificFields(
-      txType,
-      delta.tokenAmount,
-      delta.energyAmount,
-      nativeAmount,
-      toBN(amount)
-    ),
-    `${logPrefix} Tx specific fields are incorrect`
-  )
 
   const outCommit = txProof.inputs[2]
   const {
     proof: treeProof,
     nextCommitIndex
   } = pool.getVirtualTreeProof(outCommit, contractTransferIndex)
-
-  await checkAssertion(
-    () => checkCommitment(treeProof, txProof),
-    `${logPrefix} Commmitment mismatch`
-  )
 
   const data = buildTxData(
     txProof.proof,
