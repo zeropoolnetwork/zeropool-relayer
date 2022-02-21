@@ -1,5 +1,5 @@
 import '../env'
-import Web3 from 'web3'
+import { keypair } from '../services/polkadot'
 import { toBN } from 'web3-utils'
 
 const {
@@ -11,10 +11,9 @@ const {
   PORT,
 } = process.env as Record<PropertyKey, string>
 
-const relayerAddress = new Web3().eth.accounts.privateKeyToAccount(RELAYER_ADDRESS_PRIVATE_KEY).address
 export const config = {
   port: parseInt(PORT),
-  relayerAddress,
+  relayerAddress: keypair.address,
   relayerPrivateKey: RELAYER_ADDRESS_PRIVATE_KEY,
   relayerGasLimit: toBN(RELAYER_GAS_LIMIT),
   poolAddress: POOL_ADDRESS,

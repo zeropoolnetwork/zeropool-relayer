@@ -1,35 +1,19 @@
 import BN from 'bn.js'
-import Web3 from 'web3'
-import { toWei } from 'web3-utils'
+import { ApiPromise } from '@polkadot/api'
+import { keypair } from '../services/polkadot'
+import { logger } from '../services/appLogger'
+
 
 export async function signAndSend(
-  privateKey: string,
   data: string,
-  nonce: number,
-  gasPrice: string,
-  amount: BN,
-  gasLimit: string | number,
-  to: string,
-  chainId: number,
-  web3: Web3
+  api: ApiPromise,
 ): Promise<string> {
-  const serializedTx = await web3.eth.accounts.signTransaction(
-    {
-      nonce,
-      chainId,
-      to,
-      data,
-      value: toWei(amount),
-      gasPrice,
-      gas: gasLimit
-    },
-    privateKey
-  )
+  const tx = api.tx.zeropool.transact(data)
+  const { partialFee, weight } = await tx.paymentInfo(keypair);
 
-  return new Promise((res, rej) =>
-    web3.eth
-      .sendSignedTransaction(serializedTx.rawTransaction as string)
-      .once('transactionHash', res)
-      .once('error', rej)
-  )
+  logger.info(`Transaction weight: ${weight}, weight fees ${partialFee.toHuman()}`)
+
+  return await tx
+    .signAndSend(keypair)
+    .toString()
 }

@@ -1,8 +1,5 @@
 import { logger } from '../services/appLogger'
 import { redis } from '../services/redisClient'
-import { web3 } from '../services/web3'
-import { config } from '../config/config'
-import { getNonce } from './web3'
 import { pool } from '../pool'
 
 export enum RelayerKeys {
@@ -10,7 +7,6 @@ export enum RelayerKeys {
   NONCE = `relayer:nonce`
 }
 
-export const readNonce = readFieldBuilder(RelayerKeys.NONCE, () => getNonce(web3, config.relayerAddress))
 export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractTransferNum())
 
 function readFieldBuilder(

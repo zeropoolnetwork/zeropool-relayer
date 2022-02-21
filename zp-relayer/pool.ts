@@ -1,14 +1,12 @@
 import './env'
 import BN from 'bn.js'
-import PoolAbi from './abi/pool-abi.json'
-import { AbiItem, toBN } from 'web3-utils'
-import { Contract } from 'web3-eth-contract'
+import { toBN, hexToNumber, hexToNumberString } from 'web3-utils'
 import { config } from './config/config'
-import { web3 } from './services/web3'
+import { api } from './services/polkadot'
 import { logger } from './services/appLogger'
 import { txQueue } from './services/jobQueue'
 import { OUTPLUSONE } from './utils/constants'
-import { getEvents, getTransaction, getChainId } from './utils/web3'
+import { getEvents } from './utils/polkadot'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { RelayerKeys, updateField } from './utils/redisFields'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
@@ -28,7 +26,6 @@ import {
 import { TxType } from 'zp-memo-parser'
 
 class Pool {
-  public PoolInstance: Contract
   private treeParams: Params
   private txVK: VK
   public tree: MerkleTree
@@ -38,8 +35,6 @@ class Pool {
   public isInitialized = false
 
   constructor() {
-    this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
-
     this.treeParams = Params.fromFile('./params/tree_params.bin')
 
     const txVK = require('./params/transfer_verification_key.json')
@@ -50,8 +45,7 @@ class Pool {
   }
 
   async init() {
-    this.chainId = await getChainId(web3)
-    this.denominator = toBN(await this.PoolInstance.methods.denominator().call())
+    this.denominator = toBN(1000)
     await this.syncState()
     this.isInitialized = true
   }
@@ -131,7 +125,7 @@ class Pool {
     return [out_commit, memo]
   }
 
-  async syncState(fromBlock: number | string = 'earliest') {
+  async syncState(fromBlock: number = 0) {
     logger.debug('Syncing state...')
     const contractRoot = await this.getContractMerkleRoot(null)
     let localRoot = this.getLocalMerkleRoot()
@@ -151,27 +145,25 @@ class Pool {
         this.txs.delete(i)
       }
 
-      const events = await getEvents(this.PoolInstance, 'Message', { fromBlock })
+      const events = await getEvents('Message', fromBlock)
       for (let txNum = 0; txNum < events.length; txNum++) {
-        const { returnValues, transactionHash } = events[txNum]
+        const event = events[txNum]
 
-        const memoString: string = returnValues.message
-        if (!memoString) {
+        if (!event.data) {
           throw new Error('incorrect memo in event')
         }
 
-        const { input } = await getTransaction(web3, transactionHash)
-        const calldata = Buffer.from(truncateHexPrefix(input), 'hex')
+        const calldata = Buffer.from(truncateHexPrefix(event.data), 'hex')
 
         const parser = new PoolCalldataParser(calldata)
 
         const outCommitRaw = parser.getField('outCommit')
-        const outCommit = web3.utils.hexToNumberString(outCommitRaw)
+        const outCommit = hexToNumberString(outCommitRaw)
 
         const txTypeRaw = parser.getField('txType')
         const txType = toTxType(txTypeRaw)
 
-        const memoSize = web3.utils.hexToNumber(parser.getField('memoSize'))
+        const memoSize = hexToNumber(parser.getField('memoSize'))
         const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
 
         const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
@@ -197,15 +189,15 @@ class Pool {
   }
 
   async getContractTransferNum() {
-    const transferNum = await pool.PoolInstance.methods.pool_index().call()
-    return Number(transferNum)
+    const transferNum = await api.query.zeropool.poolIndex()
+    return Number(transferNum.toString()) // FIXME: Is this correct?
   }
 
   async getContractMerkleRoot(index: string | undefined | null): Promise<string> {
     if (!index) {
-      index = await this.PoolInstance.methods.pool_index().call()
+      index = await (await api.query.zeropool.poolIndex()).toString()
     }
-    const root = await this.PoolInstance.methods.roots(index).call()
+    const root = await api.query.zeropool.roots(index)
     return root.toString()
   }
 

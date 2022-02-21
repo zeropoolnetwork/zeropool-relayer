@@ -2,20 +2,18 @@ import BN from 'bn.js'
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
 import { Job, Worker } from 'bullmq'
-import { web3 } from './services/web3'
+import { api } from './services/polkadot'
 import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
 import { TxPayload } from './services/jobQueue'
 import { TX_QUEUE_NAME, OUTPLUSONE, TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE } from './utils/constants'
-import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
+import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
 import { Helpers, Proof, SnarkProof } from 'libzeropool-rs-node'
 import { pool } from './pool'
 import { getTxData, TxType } from 'zp-memo-parser'
 import { config } from './config/config'
-
-const PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[])
 
 const {
   RELAYER_ADDRESS_PRIVATE_KEY,
@@ -40,8 +38,10 @@ function checkTxProof(txProof: Proof) {
 }
 
 async function checkNullifier(nullifier: string) {
-  const exists = await pool.PoolInstance.methods.nullifiers(nullifier).call()
-  return toBN(exists).eq(ZERO)
+  const res = await api.query.zeropool.nullifiers(nullifier)
+  // No idea what the type here is supposed to be
+  // @ts-ignore
+  return res.isSome
 }
 
 function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
@@ -116,7 +116,7 @@ function buildTxData(
   depositSignature: string | null
 ) {
 
-  const selector: string = PoolInstance.methods.transact().encodeABI()
+  const selector: string = '0x00000000'
 
   const transferIndex = numToHex(delta.transferIndex, TRANSFER_INDEX_SIZE)
   const energyAmount = numToHex(delta.energyAmount, ENERGY_SIZE)
@@ -230,21 +230,12 @@ async function processTx(job: Job<TxPayload>) {
     depositSignature
   )
 
-  const nonce = Number(await readNonce(true))
   const txHash = await signAndSend(
-    RELAYER_ADDRESS_PRIVATE_KEY,
     data,
-    nonce,
-    GAS_PRICE,
-    toBN(amount),
-    gas,
-    to,
-    pool.chainId,
-    web3
+    api
   )
   logger.debug(`${logPrefix} TX hash ${txHash}`)
 
-  await updateField(RelayerKeys.NONCE, nonce + 1)
   await updateField(RelayerKeys.TRANSFER_NUM, contractTransferIndex + OUTPLUSONE)
 
   const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
@@ -261,10 +252,6 @@ async function processTx(job: Job<TxPayload>) {
 
 
 export async function createTxWorker() {
-  // Reset nonce
-  const nonce = Number(await readNonce(true))
-  await updateField(RelayerKeys.NONCE, nonce + 1)
-
   await pool.init()
 
   const worker = new Worker<TxPayload>(
