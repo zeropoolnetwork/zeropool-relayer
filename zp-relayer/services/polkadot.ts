@@ -1,3 +1,5 @@
+import '@polkadot/api-augment/substrate';
+
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import { Keyring } from '@polkadot/keyring'
 import { KeyringPair } from '@polkadot/keyring/types'
