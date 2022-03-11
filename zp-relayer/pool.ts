@@ -56,7 +56,6 @@ class Pool {
     const job = await txQueue.add('test-tx', {
       to: config.poolAddress,
       amount: '0',
-      gas: config.relayerGasLimit.toString(),
       txProof,
       txType,
       rawMemo,
@@ -145,7 +144,8 @@ class Pool {
         this.txs.delete(i)
       }
 
-      const events = await getEvents('Message', fromBlock)
+      const events = await getEvents(fromBlock)
+      // TODO: Utilize fromBlock
       for (let txNum = 0; txNum < events.length; txNum++) {
         const event = events[txNum]
 

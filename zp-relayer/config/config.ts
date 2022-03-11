@@ -13,9 +13,6 @@ const {
 
 export const config = {
   port: parseInt(PORT),
-  relayerAddress: keypair.address,
-  relayerPrivateKey: RELAYER_ADDRESS_PRIVATE_KEY,
-  relayerGasLimit: toBN(RELAYER_GAS_LIMIT),
   poolAddress: POOL_ADDRESS,
   relayerFee: toBN(RELAYER_FEE),
   maxFaucet: toBN(MAX_NATIVE_AMOUNT_FAUCET),

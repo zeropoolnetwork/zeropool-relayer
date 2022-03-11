@@ -7,7 +7,6 @@ import { TxType } from 'zp-memo-parser'
 export interface TxPayload {
   to: string
   amount: string
-  gas: string | number
   txProof: Proof
   txType: TxType
   rawMemo: string

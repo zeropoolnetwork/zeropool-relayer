@@ -1,8 +1,7 @@
 import BN from 'bn.js'
-import PoolAbi from './abi/pool-abi.json'
-import { AbiItem, toBN } from 'web3-utils'
+import { toBN } from 'web3-utils'
 import { Job, Worker } from 'bullmq'
-import { api } from './services/polkadot'
+import { api, initPolkadot } from './services/polkadot'
 import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
 import { TxPayload } from './services/jobQueue'
@@ -154,9 +153,7 @@ function buildTxData(
 
 async function processTx(job: Job<TxPayload>) {
   const {
-    to,
     amount,
-    gas,
     txProof,
     txType,
     rawMemo,
@@ -252,6 +249,7 @@ async function processTx(job: Job<TxPayload>) {
 
 
 export async function createTxWorker() {
+  initPolkadot()
   await pool.init()
 
   const worker = new Worker<TxPayload>(

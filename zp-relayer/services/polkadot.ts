@@ -1,12 +1,32 @@
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import { Keyring } from '@polkadot/keyring'
+import { KeyringPair } from '@polkadot/keyring/types'
+import { cryptoWaitReady } from '@polkadot/util-crypto'
 const {
   RPC_URL,
   RELAYER_ADDRESS_PRIVATE_KEY,
-} = process.env as Record<PropertyKey, string>
+} = process.env as { [key: PropertyKey]: string }
 
+// TODO: Remove globals
 // Construct
 const wsProvider = new WsProvider(RPC_URL)
-export const api = new ApiPromise({ provider: wsProvider })
-export const keyring = new Keyring({ type: 'sr25519' })
-export const keypair = keyring.addFromUri(RELAYER_ADDRESS_PRIVATE_KEY)
+export const api = new ApiPromise({
+  provider: wsProvider,
+  types: {
+    ZeropoolEvent: {
+      _enum: {
+        Message: '(u32, u32, Vec<u8>)',
+      }
+    }
+  }
+})
+// FIXME: Find a better way to initialize the library
+export let keyring: Keyring
+export let keypair: KeyringPair
+
+export async function initPolkadot() {
+  await cryptoWaitReady()
+  await api.isReadyOrError
+  keyring = new Keyring({ type: 'sr25519' })
+  keypair = keyring.addFromUri(RELAYER_ADDRESS_PRIVATE_KEY)
+}
