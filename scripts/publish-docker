@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+docker build -f docker/Dockerfile.relayer -t voidxnull/zeropool-relayer-polkadot --build-arg VERIFIER_IMAGE=lok52/verifier:latest . && \
+docker push voidxnull/zeropool-relayer-polkadot
