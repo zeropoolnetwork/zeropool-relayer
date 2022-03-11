@@ -19,6 +19,7 @@ export async function getEvents(_fromBlock: number = 0): Promise<MessageEvent[]>
     events.forEach((ev) => {
       if (ev.section.eq('Zeropool') && ev.method.eq('Message')) {
         let [poolIndex, allMessagesHash, data] = ev.event.data.toJSON()
+        logger.debug('Found zeropool Message event (index %o)', poolIndex);
         pastEvents.push({ poolIndex, allMessagesHash, data })
       }
     });
