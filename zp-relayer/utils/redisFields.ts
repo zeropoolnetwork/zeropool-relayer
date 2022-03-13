@@ -4,10 +4,12 @@ import { pool } from '../pool'
 
 export enum RelayerKeys {
   TRANSFER_NUM = 'relayer:transferNum',
-  NONCE = `relayer:nonce`
+  NONCE = `relayer:nonce`,
+  LATEST_CHECKED_BLOCK = `relayer:latestCheckedBlock`,
 }
 
 export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractTransferNum())
+export const readLatestCheckedBlock = readFieldBuilder(RelayerKeys.LATEST_CHECKED_BLOCK, () => 0)
 
 function readFieldBuilder(
   key: RelayerKeys,

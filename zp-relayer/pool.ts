@@ -6,9 +6,9 @@ import { api } from './services/polkadot'
 import { logger } from './services/appLogger'
 import { txQueue } from './services/jobQueue'
 import { OUTPLUSONE } from './utils/constants'
-import { getEvents } from './utils/polkadot'
+import { getEvents as getNewEvents } from './utils/polkadot'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
-import { RelayerKeys, updateField } from './utils/redisFields'
+import { readLatestCheckedBlock, RelayerKeys, updateField } from './utils/redisFields'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import {
   Params,
@@ -46,7 +46,8 @@ class Pool {
 
   async init() {
     this.denominator = toBN(1000)
-    await this.syncState()
+    // Work around for the slow start of the substrate node.
+    // await this.syncState()
     this.isInitialized = true
   }
 
@@ -124,7 +125,7 @@ class Pool {
     return [out_commit, memo]
   }
 
-  async syncState(fromBlock: number = 0) {
+  async syncState() {
     logger.debug('Syncing state...')
     const contractRoot = await this.getContractMerkleRoot(null)
     let localRoot = this.getLocalMerkleRoot()
@@ -133,47 +134,37 @@ class Pool {
     if (contractRoot !== localRoot) {
       logger.debug('ROOT MISMATCH')
 
-      // Zero out existing hashes
-      const nextIndex = this.tree.getNextIndex()
-      for (let i = 0; i < nextIndex; i++) {
-        const emptyHash = Buffer.alloc(32)
-        this.tree.addHash(i, emptyHash)
-      }
-      // Clear tx storage
-      for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
-        this.txs.delete(i)
-      }
+      // // Zero out existing hashes
+      // const nextIndex = this.tree.getNextIndex()
+      // for (let i = 0; i < nextIndex; i++) {
+      //   const emptyHash = Buffer.alloc(32)
+      //   this.tree.addHash(i, emptyHash)
+      // }
+      // // Clear tx storage
+      // for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
+      //   this.txs.delete(i)
+      // }
 
-      const events = await getEvents(fromBlock)
-      // TODO: Utilize fromBlock
-      for (let txNum = 0; txNum < events.length; txNum++) {
-        const event = events[txNum]
+      const events = await getNewEvents()
+      for (let i = 0; i < events.length; i++) {
+        const event = events[i]
 
         if (!event.data) {
           throw new Error('incorrect memo in event')
         }
 
-        const calldata = Buffer.from(truncateHexPrefix(event.data), 'hex')
-
-        const parser = new PoolCalldataParser(calldata)
-
-        const outCommitRaw = parser.getField('outCommit')
-        const outCommit = hexToNumberString(outCommitRaw)
-
-        const txTypeRaw = parser.getField('txType')
-        const txType = toTxType(txTypeRaw)
-
-        const memoSize = hexToNumber(parser.getField('memoSize'))
-        const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
-
-        const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
+        const outCommit = hexToNumberString(event.outCommit)
+        const truncatedMemo = truncateHexPrefix(event.data)
         const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
 
-        this.addCommitment(txNum, Helpers.strToNum(outCommit))
-        pool.txs.add(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
+        logger.info(`Adding commitment at ${this.txs.count() + i}`)
+        this.addCommitment(this.txs.count() + i, Helpers.strToNum(outCommit))
+
+        logger.info(`Adding transaction at ${this.txs.count() + i}`)
+        pool.txs.add((i + this.txs.count()) * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
       }
 
-      await updateField(RelayerKeys.TRANSFER_NUM, events.length * OUTPLUSONE)
+      await updateField(RelayerKeys.TRANSFER_NUM, (events.length + this.txs.count()) * OUTPLUSONE)
 
       localRoot = this.getLocalMerkleRoot()
       logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
@@ -212,14 +203,13 @@ class Pool {
 
   async getTransactions(limit: number, offset: number) {
     await this.syncState()
-    const txs: (string | null)[] = new Array(limit)
-    offset = Math.ceil(offset / OUTPLUSONE)
+    const txs: (string | null)[] = []
     for (let i = 0; i < limit; i++) {
       const tx = this.txs.get(offset + i * OUTPLUSONE)
       if (tx) {
         txs[i] = tx.toString('hex')
       } else {
-        txs[i] = null
+        break;
       }
     }
     return txs

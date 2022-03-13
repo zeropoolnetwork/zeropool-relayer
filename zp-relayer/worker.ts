@@ -40,7 +40,7 @@ async function checkNullifier(nullifier: string) {
   const res = await api.query.zeropool.nullifiers(nullifier)
   // No idea what the type here is supposed to be
   // @ts-ignore
-  return res.isSome
+  return !res.isSome
 }
 
 function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
@@ -227,6 +227,23 @@ async function processTx(job: Job<TxPayload>) {
     depositSignature
   )
 
+  logger.info(`
+Transaction:
+  selector: 00000000
+  nullifier: ${txProof.inputs[1]}
+  outCommit: ${treeProof.inputs[2]}
+  transferIndex: ${delta.transferIndex}
+  energyAmount: ${delta.energyAmount}
+  tokenAmount: ${delta.tokenAmount}
+  txProof: ${JSON.stringify(txProof.proof)}
+  rootAfter: ${treeProof.inputs[1]}
+  treeProof: ${JSON.stringify(treeProof.proof)}
+  txType: ${txType}
+  memoSize: ${rawMemo.length / 2}
+  memoMessage: ${rawMemo}
+  depositSignature: ${depositSignature}
+`)
+
   const txHash = await signAndSend(
     data,
     api
@@ -235,14 +252,14 @@ async function processTx(job: Job<TxPayload>) {
 
   await updateField(RelayerKeys.TRANSFER_NUM, contractTransferIndex + OUTPLUSONE)
 
-  const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
-  const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
+  // const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
+  // const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
 
-  logger.debug(`${logPrefix} Updating tree`)
-  pool.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
+  // logger.debug(`${logPrefix} Updating tree`)
+  // pool.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
 
-  logger.debug(`${logPrefix} Adding tx to storage`)
-  pool.txs.add(contractTransferIndex, Buffer.from(commitAndMemo, 'hex'))
+  // logger.debug(`${logPrefix} Adding tx to storage`)
+  // pool.txs.add(contractTransferIndex, Buffer.from(commitAndMemo, 'hex'))
 
   return txHash
 }
