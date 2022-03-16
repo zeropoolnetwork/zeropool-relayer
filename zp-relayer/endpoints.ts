@@ -41,8 +41,8 @@ async function merkleRoot(req: Request, res: Response) {
 }
 
 async function getTransactions(req: Request, res: Response) {
-  const limit = parseInt(req.query.limit as string)
-  const offset = parseInt(req.query.offset as string)
+  const limit = parseInt(req.query.limit as string || '100')
+  const offset = parseInt(req.query.offset as string || '0')
   const txs = await pool.getTransactions(limit, offset)
   res.json(txs)
 }
