@@ -8,6 +8,7 @@ tree.db
 txs.db
 
 *params.bin
+*_key.json
 
 .env
 

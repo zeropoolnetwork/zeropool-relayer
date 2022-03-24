@@ -15,7 +15,7 @@ const {
 
 const relayerAddress = new Web3().eth.accounts.privateKeyToAccount(RELAYER_ADDRESS_PRIVATE_KEY).address
 export const config = {
-  port: parseInt(PORT),
+  port: PORT ? parseInt(PORT) : 8000,
   relayerAddress,
   relayerPrivateKey: RELAYER_ADDRESS_PRIVATE_KEY,
   relayerGasLimit: toBN(RELAYER_GAS_LIMIT),
