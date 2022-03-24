@@ -13,7 +13,7 @@
     "test-e2e"
   ],
   "scripts": {
-    "initialize": "git submodule update --init && yarn install --unsafe-perm --frozen-lockfile",
+    "initialize": "yarn install --unsafe-perm --frozen-lockfile",
     "build:relayer": "yarn workspace zp-relayer run build",
     "build:memo": "yarn workspace zp-memo-parser run build"
   }

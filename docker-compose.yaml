@@ -13,14 +13,6 @@ services:
       - 8545:8545
   contracts:
     image: lok52/zp-contracts:latest
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.contracts
-      args:
-        - VERIFIER_IMAGE=lok52/verifier:latest
-    depends_on:
-      - verifier
-      - ganache
   verifier:
     image: lok52/verifier:latest
     build:
