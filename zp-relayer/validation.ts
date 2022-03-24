@@ -65,18 +65,18 @@ export function parseDelta(delta: string): Delta {
   }
 }
 
-export function checkFeeAndNativeAmount(fee: BN, nativeAmount: BN | null) {
-  logger.debug(`Fee: ${fee}`)
+export function checkNativeAmount(nativeAmount: BN | null) {
   logger.debug(`Native amount: ${nativeAmount}`)
   // Check native amount (relayer faucet)
   if (nativeAmount && nativeAmount > config.maxFaucet) {
     return false
   }
-  // Check user fee
-  if (fee < config.relayerFee) {
-    return false
-  }
   return true
+}
+
+export function checkFee(fee: BN) {
+  logger.debug(`Fee: ${fee}`)
+  return fee >= config.relayerFee
 }
 
 export async function checkAssertion(f: Function, errStr: string) {

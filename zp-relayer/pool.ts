@@ -27,7 +27,8 @@ import {
 } from 'libzeropool-rs-node'
 import {
   checkAssertion,
-  checkFeeAndNativeAmount,
+  checkNativeAmount,
+  checkFee,
   checkNullifier,
   checkTransferIndex,
   checkTxProof,
@@ -78,8 +79,13 @@ class Pool {
     const { fee, nativeAmount } = getTxData(buf, txType)
 
     await checkAssertion(
-      () => checkFeeAndNativeAmount(fee, nativeAmount),
+      () => checkFee(fee),
       `Fee too low`
+    )
+
+    await checkAssertion(
+      () => checkNativeAmount(nativeAmount),
+      `Native amount too high`
     )
 
     await checkAssertion(
