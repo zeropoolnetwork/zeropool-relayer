@@ -3346,7 +3346,7 @@ latest-version@^5.1.0:
   dependencies:
     package-json "^6.3.0"
 
-libzeropool-rs-node@^0.1.19:
+libzeropool-rs-node@^0.1.20:
   version "0.1.20"
   resolved "https://registry.yarnpkg.com/libzeropool-rs-node/-/libzeropool-rs-node-0.1.20.tgz#d0af26e20dda01189fcd099111d76d3afc752de6"
   integrity sha512-BrgDl6AMO29W5XO58QclgF9sOWWvoUom/D0Rkah91RJgyX6IbstqSnC9DVidul7IL0skEIFXr+E2GQiIU4rCbQ==

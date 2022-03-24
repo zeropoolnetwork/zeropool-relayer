@@ -268,10 +268,15 @@ class Pool {
 
   async getTransactions(limit: number, offset: number) {
     await this.syncState()
-    const txs: (Buffer | null)[] = new Array(limit)
-    offset = Math.ceil(offset / OUTPLUSONE)
+    const txs: string[] = []
+    offset = Math.floor(offset / OUTPLUSONE) * OUTPLUSONE
     for (let i = 0; i < limit; i++) {
-      txs[i] = this.txs.get(offset + i * OUTPLUSONE)
+      const tx = this.txs.get(offset + i * OUTPLUSONE)
+      if (tx) {
+        txs[i] = tx.toString('hex')
+      } else {
+        break;
+      }
     }
     return txs
   }
