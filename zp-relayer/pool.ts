@@ -40,9 +40,9 @@ class Pool {
   constructor() {
     this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
 
-    this.treeParams = Params.fromFile('./params/tree_params.bin')
+    this.treeParams = Params.fromFile(config.treeUpdateParamsPath)
 
-    const txVK = require('./params/transfer_verification_key.json')
+    const txVK = require(config.txVKPath)
     this.txVK = txVK
 
     this.tree = new MerkleTree('./tree.db')

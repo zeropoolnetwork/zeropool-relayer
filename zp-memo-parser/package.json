@@ -1,9 +1,12 @@
 {
   "name": "zp-memo-parser",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "license": "MIT",
-  "main": "build/memo.js",
-  "types": "build/memo.d.ts",
+  "main": "lib/memo.js",
+  "types": "lib/memo.d.ts",
+  "files": [
+    "lib"
+  ],
   "scripts": {
     "build": "tsc"
   },
