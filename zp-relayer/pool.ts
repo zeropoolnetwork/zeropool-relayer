@@ -161,13 +161,15 @@ class Pool {
         this.addCommitment(this.txs.count() + i, Helpers.strToNum(outCommit))
 
         logger.info(`Adding transaction at ${this.txs.count() + i}`)
-        pool.txs.add((i + this.txs.count()) * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
+        pool.txs.add((this.txs.count() + i) * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
       }
 
       await updateField(RelayerKeys.TRANSFER_NUM, (events.length + this.txs.count()) * OUTPLUSONE)
 
       localRoot = this.getLocalMerkleRoot()
       logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
+
+      logger.debug(`Next index after update: ${pool.tree.getNextIndex()}`)
     }
   }
 
