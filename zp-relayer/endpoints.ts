@@ -38,10 +38,14 @@ async function transaction(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-async function merkleRoot(req: Request, res: Response) {
+async function merkleRoot(req: Request, res: Response, next: NextFunction) {
   const index = req.params.index
-  const root = await pool.getContractMerkleRoot(index)
-  res.json(root)
+  try {
+    const root = await pool.getContractMerkleRoot(index)
+    res.json(root)
+  } catch (err) {
+    next(err)
+  }
 }
 
 async function getTransactions(req: Request, res: Response) {
