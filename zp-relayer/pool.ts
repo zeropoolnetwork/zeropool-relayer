@@ -159,18 +159,21 @@ class Pool {
           const event = events[i]
 
           if (!event.data) {
-            throw new Error('incorrect memo in event')
+            logger.warn('incorrect memo in event')
+            continue
           }
 
           const outCommit = hexToNumberString(event.outCommit)
           const truncatedMemo = truncateHexPrefix(event.data)
           const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
 
-          logger.info(`Adding commitment at ${this.txs.count() + i}`)
-          this.addCommitment(this.txs.count() + i, Helpers.strToNum(outCommit))
+          const commitIndex = this.txs.count()
+          logger.info(`Adding commitment at ${commitIndex}`)
+          this.addCommitment(commitIndex, Helpers.strToNum(outCommit))
 
-          logger.info(`Adding transaction at ${this.txs.count() + i}`)
-          pool.txs.add((this.txs.count() + i) * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
+          const txIndex = this.txs.count() * OUTPLUSONE
+          logger.info(`Adding transaction at ${txIndex}`)
+          pool.txs.add(txIndex, Buffer.from(commitAndMemo, 'hex'))
         }
 
         await updateField(RelayerKeys.TRANSFER_NUM, (events.length + this.txs.count()) * OUTPLUSONE)
