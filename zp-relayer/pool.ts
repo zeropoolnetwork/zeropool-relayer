@@ -1,6 +1,7 @@
 import './env'
 import BN from 'bn.js'
 import { toBN, hexToNumber, hexToNumberString } from 'web3-utils'
+import { Mutex } from 'async-mutex'
 import { config } from './config/config'
 import { api } from './services/polkadot'
 import { logger } from './services/appLogger'
@@ -25,6 +26,7 @@ import {
 } from 'libzeropool-rs-node'
 import { TxType } from 'zp-memo-parser'
 
+const syncMutex = new Mutex()
 class Pool {
   private treeParams: Params
   private txVK: VK
@@ -126,51 +128,59 @@ class Pool {
   }
 
   async syncState() {
-    logger.debug('Syncing state...')
-    const contractRoot = await this.getContractMerkleRoot(null)
-    let localRoot = this.getLocalMerkleRoot()
-    logger.debug(`LATEST CONTRACT ROOT ${contractRoot}`)
-    logger.debug(`LATEST LOCAL ROOT ${localRoot}`)
-    if (contractRoot !== localRoot) {
-      logger.debug('ROOT MISMATCH')
+    if (syncMutex.isLocked()) {
+      logger.debug('Sync already in progress')
+      await syncMutex.waitForUnlock()
+      return
+    }
 
-      // // Zero out existing hashes
-      // const nextIndex = this.tree.getNextIndex()
-      // for (let i = 0; i < nextIndex; i++) {
-      //   const emptyHash = Buffer.alloc(32)
-      //   this.tree.addHash(i, emptyHash)
-      // }
-      // // Clear tx storage
-      // for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
-      //   this.txs.delete(i)
-      // }
+    await syncMutex.runExclusive(async () => {
+      logger.debug('Syncing state...')
+      const contractRoot = await this.getContractMerkleRoot(null)
+      let localRoot = this.getLocalMerkleRoot()
+      logger.debug(`LATEST CONTRACT ROOT ${contractRoot}`)
+      logger.debug(`LATEST LOCAL ROOT ${localRoot}`)
+      if (contractRoot !== localRoot) {
+        logger.debug('ROOT MISMATCH')
 
-      const events = await getNewEvents()
-      for (let i = 0; i < events.length; i++) {
-        const event = events[i]
+        // // Zero out existing hashes
+        // const nextIndex = this.tree.getNextIndex()
+        // for (let i = 0; i < nextIndex; i++) {
+        //   const emptyHash = Buffer.alloc(32)
+        //   this.tree.addHash(i, emptyHash)
+        // }
+        // // Clear tx storage
+        // for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
+        //   this.txs.delete(i)
+        // }
 
-        if (!event.data) {
-          throw new Error('incorrect memo in event')
+        const events = await getNewEvents()
+        for (let i = 0; i < events.length; i++) {
+          const event = events[i]
+
+          if (!event.data) {
+            throw new Error('incorrect memo in event')
+          }
+
+          const outCommit = hexToNumberString(event.outCommit)
+          const truncatedMemo = truncateHexPrefix(event.data)
+          const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
+
+          logger.info(`Adding commitment at ${this.txs.count() + i}`)
+          this.addCommitment(this.txs.count() + i, Helpers.strToNum(outCommit))
+
+          logger.info(`Adding transaction at ${this.txs.count() + i}`)
+          pool.txs.add((this.txs.count() + i) * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
         }
 
-        const outCommit = hexToNumberString(event.outCommit)
-        const truncatedMemo = truncateHexPrefix(event.data)
-        const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
+        await updateField(RelayerKeys.TRANSFER_NUM, (events.length + this.txs.count()) * OUTPLUSONE)
 
-        logger.info(`Adding commitment at ${this.txs.count() + i}`)
-        this.addCommitment(this.txs.count() + i, Helpers.strToNum(outCommit))
+        localRoot = this.getLocalMerkleRoot()
+        logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
 
-        logger.info(`Adding transaction at ${this.txs.count() + i}`)
-        pool.txs.add((this.txs.count() + i) * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
+        logger.debug(`Next index after update: ${pool.tree.getNextIndex()}`)
       }
-
-      await updateField(RelayerKeys.TRANSFER_NUM, (events.length + this.txs.count()) * OUTPLUSONE)
-
-      localRoot = this.getLocalMerkleRoot()
-      logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
-
-      logger.debug(`Next index after update: ${pool.tree.getNextIndex()}`)
-    }
+    })
   }
 
   getTreeProof(pub: TreePub, sec: TreeSec): Proof {
