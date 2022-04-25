@@ -63,7 +63,6 @@ async function getJob(req: Request, res: Response) {
 }
 
 async function relayerInfo(req: Request, res: Response) {
-  await pool.syncState()
   const deltaIndex = pool.tree.getNextIndex()
   const root = pool.getLocalMerkleRoot()
 

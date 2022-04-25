@@ -7,7 +7,7 @@ import { api } from './services/polkadot'
 import { logger } from './services/appLogger'
 import { txQueue } from './services/jobQueue'
 import { OUTPLUSONE } from './utils/constants'
-import { getEvents as getNewEvents } from './utils/polkadot'
+import { getEvents as getNewEvents, MessageEvent, subscibeToEvents } from './utils/polkadot'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from './utils/redisFields'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
@@ -49,7 +49,8 @@ class Pool {
   async init() {
     this.denominator = toBN(1000)
     // Work around for the slow start of the substrate node.
-    // await this.syncState()
+    await this.syncState()
+    this.startStateMaintance()
     this.isInitialized = true
   }
 
@@ -127,6 +128,29 @@ class Pool {
     return [out_commit, memo]
   }
 
+  startStateMaintance() {
+    subscibeToEvents(this.onNewEvent.bind(this))
+  }
+
+  async onNewEvent(event: MessageEvent): Promise<void> {
+    if (!event.data) {
+      logger.warn('incorrect memo in event')
+      return
+    }
+
+    const outCommit = hexToNumberString(event.outCommit)
+    const truncatedMemo = truncateHexPrefix(event.data)
+    const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
+
+    const commitIndex = this.txs.count()
+    logger.info(`Adding commitment at ${commitIndex}`)
+    this.addCommitment(commitIndex, Helpers.strToNum(outCommit))
+
+    const txIndex = this.txs.count() * OUTPLUSONE
+    logger.info(`Adding transaction at ${txIndex}`)
+    pool.txs.add(txIndex, Buffer.from(commitAndMemo, 'hex'))
+  }
+
   async syncState() {
     if (syncMutex.isLocked()) {
       logger.debug('Sync already in progress')
@@ -143,37 +167,11 @@ class Pool {
       if (contractRoot !== localRoot) {
         logger.debug('ROOT MISMATCH')
 
-        // // Zero out existing hashes
-        // const nextIndex = this.tree.getNextIndex()
-        // for (let i = 0; i < nextIndex; i++) {
-        //   const emptyHash = Buffer.alloc(32)
-        //   this.tree.addHash(i, emptyHash)
-        // }
-        // // Clear tx storage
-        // for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
-        //   this.txs.delete(i)
-        // }
-
         const events = await getNewEvents()
-        for (let i = 0; i < events.length; i++) {
-          const event = events[i]
 
-          if (!event.data) {
-            logger.warn('incorrect memo in event')
-            continue
-          }
-
-          const outCommit = hexToNumberString(event.outCommit)
-          const truncatedMemo = truncateHexPrefix(event.data)
-          const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
-
-          const commitIndex = this.txs.count()
-          logger.info(`Adding commitment at ${commitIndex}`)
-          this.addCommitment(commitIndex, Helpers.strToNum(outCommit))
-
-          const txIndex = this.txs.count() * OUTPLUSONE
-          logger.info(`Adding transaction at ${txIndex}`)
-          pool.txs.add(txIndex, Buffer.from(commitAndMemo, 'hex'))
+        // TODO: Extract this into a function
+        for (const event of events) {
+          this.onNewEvent(event)
         }
 
         await updateField(RelayerKeys.TRANSFER_NUM, (events.length + this.txs.count()) * OUTPLUSONE)
@@ -217,7 +215,6 @@ class Pool {
   }
 
   async getTransactions(limit: number, offset: number) {
-    await this.syncState()
     const txs: (string | null)[] = []
     for (let i = 0; i < limit; i++) {
       const tx = this.txs.get(offset + i * OUTPLUSONE)

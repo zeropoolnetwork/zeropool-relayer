@@ -9,10 +9,14 @@ import { readLatestCheckedBlock, RelayerKeys, updateField } from './redisFields'
 
 export type MessageEvent = { poolIndex: string, allMessagesHash: string, outCommit: string, data: string }
 
+function transformEvent(ev: any): MessageEvent {
+  let [poolIndex, allMessagesHash, outCommit, data] = ev.data.toJSON() as any
+  return { poolIndex, allMessagesHash, outCommit, data }
+}
+
 // TODO: Subscribe to event and update state in background?
 // FIXME: Find a way to get only events that are actually needed respecting topics and fromBlock (or an alternative).
 export async function getEvents(): Promise<MessageEvent[]> {
-
   try {
     const pastEvents: MessageEvent[] = []
     const fromBlock = Number(await readLatestCheckedBlock())
@@ -28,11 +32,12 @@ export async function getEvents(): Promise<MessageEvent[]> {
       let hash = await api.rpc.chain.getBlockHash(i)
       let events = await api.query.system.events.at(hash)
 
-      events.forEach((ev) => {
-        if (ev.event.section == 'zeropool' && ev.event.method == 'Message') {
-          let [poolIndex, allMessagesHash, outCommit, data] = ev.event.data.toJSON() as any
-          logger.debug('Found zeropool Message event (index %o)', poolIndex)
-          pastEvents.push({ poolIndex, allMessagesHash, outCommit, data })
+      events.forEach((record) => {
+        const ev = record.event
+        if (ev.section == 'zeropool' && ev.method == 'Message') {
+          const event = transformEvent(ev)
+          logger.debug('Found zeropool Message event (index %o)', event.poolIndex)
+          pastEvents.push(event)
         }
       });
     }
@@ -45,4 +50,19 @@ export async function getEvents(): Promise<MessageEvent[]> {
     if (e instanceof Error) logger.error(e.message)
     throw new Error(`Events could not be obtained`)
   }
+}
+
+export async function subscibeToEvents(handler: (event: MessageEvent) => Promise<void>) {
+  api.query.system.events((events) => {
+    logger.debug(`Received ${events.length} events:`);
+
+    events.forEach((record) => {
+      const { event: ev } = record;
+      if (ev.section == 'zeropool' && ev.method == 'Message') {
+        const event = transformEvent(ev)
+        logger.info(`New Message event at ${event.poolIndex}`);
+        handler(event)
+      }
+    });
+  });
 }
