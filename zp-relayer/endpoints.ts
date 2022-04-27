@@ -13,7 +13,7 @@ const txProof = (() => {
   let txProofNum = 0
   return (req: Request, res: Response) => {
     logger.debug('Proving tx...')
-    const { pub, sec } = JSON.parse(req.body)
+    const { pub, sec } = req.body
     if (logger.isDebugEnabled()) {
       fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
       txProofNum += 1
@@ -29,7 +29,7 @@ const txProof = (() => {
 })()
 
 async function transaction(req: Request, res: Response, next: NextFunction) {
-  const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
+  const { proof, memo, txType, depositSignature } = req.body
   try {
     const jobId = await pool.transact(proof, memo, txType, depositSignature)
     res.json({ jobId })

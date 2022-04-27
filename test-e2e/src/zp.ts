@@ -38,7 +38,7 @@ export async function syncAccounts(accounts: UserAccount[], relayerUrl = relayer
 
 export async function syncNotesAndAccount(account: UserAccount, relayerUrl = relayerUrlFirst, numTxs = 20n, offset = 0n) {
   const txs = await fetch(
-    `${relayerUrl}/transactions/${numTxs.toString()}/${offset.toString()}`
+    `${relayerUrl}/transactions?limit=${numTxs.toString()}&offset=${offset.toString()}`
   ).then(r => r.json())
 
   // Extract user's accounts and notes from memo blocks
@@ -50,11 +50,14 @@ export async function syncNotesAndAccount(account: UserAccount, relayerUrl = rel
     accountToDelta[account] = (txNum + 1) * 128
 
     // little-endian
-    const commitment = Uint8Array.from(tx.data.slice(0, 32)).reverse()
-    console.log('Memo commit', Helpers.numToStr(commitment))
-    account.addCommitment(BigInt(txNum), commitment)
 
-    const buf = Uint8Array.from(tx.data.slice(32))
+    const txData = Buffer.from(tx,'hex')
+
+    const commitment = Uint8Array.from(txData.slice(0, 32)).reverse()
+    
+    account.addCommitment(BigInt(txNum), commitment)
+    
+    const buf = Uint8Array.from(txData.slice(32))
 
     console.log(buf.toString().slice(0, 100))
     console.log(buf.length)
