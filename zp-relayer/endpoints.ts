@@ -3,7 +3,7 @@ import childProcess from 'child_process'
 import { Request, Response, NextFunction } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
-import { txQueue } from './services/jobQueue'
+import { poolTxQueue } from './services/poolTxQueue'
 
 const {
   TX_PROOFS_DIR,
@@ -67,7 +67,7 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
 
 async function getJob(req: Request, res: Response) {
   const jobId = req.params.id
-  const job = await txQueue.getJob(jobId)
+  const job = await poolTxQueue.getJob(jobId)
   if (job) {
     const state = await job.getState()
     const txHash = job.returnvalue
@@ -81,7 +81,7 @@ async function getJob(req: Request, res: Response) {
 }
 
 function relayerInfo(req: Request, res: Response) {
-  const deltaIndex = pool.tree.getNextIndex()
+  const deltaIndex = pool.poolTree.getNextIndex()
   const root = pool.getLocalMerkleRoot()
 
   res.json({

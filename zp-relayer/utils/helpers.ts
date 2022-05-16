@@ -17,9 +17,16 @@ export function toTxType(t: string): TxType {
   }
 }
 
-export function truncateMemoTxPrefix(memo: string, txType: TxType) {
+const txTypePrefixLen = {
+  [TxType.DEPOSIT]: 16,
+  [TxType.TRANSFER]: 16,
   // 16 + 16 + 40
-  const txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
+  [TxType.WITHDRAWAL]: 72,
+  [TxType.PERMITTABLE_DEPOSIT]: 72,
+}
+
+export function truncateMemoTxPrefix(memo: string, txType: TxType) {
+  const txSpecificPrefixLen = txTypePrefixLen[txType]
   return memo.slice(txSpecificPrefixLen)
 }
 

@@ -13,6 +13,6 @@ export interface TxPayload {
   rawMemo: string
   depositSignature: string | null
 }
-export const txQueue = new Queue<TxPayload, string>(TX_QUEUE_NAME, {
+export const poolTxQueue = new Queue<TxPayload, string>(TX_QUEUE_NAME, {
   connection: redis
 })

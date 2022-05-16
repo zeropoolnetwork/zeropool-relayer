@@ -6,7 +6,7 @@ import { Contract } from 'web3-eth-contract'
 import { config } from './config/config'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
-import { txQueue } from './services/jobQueue'
+import { poolTxQueue } from './services/poolTxQueue'
 import { OUTPLUSONE } from './utils/constants'
 import { getEvents, getTransaction, getChainId } from './utils/web3'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
@@ -36,14 +36,16 @@ import {
   parseDelta,
 } from './validation'
 
-import { getTxData, TxType } from 'zp-memo-parser'
+import { getTxData, TxType, WithdrawTxData } from 'zp-memo-parser'
 
 class Pool {
   public PoolInstance: Contract
   private treeParams: Params
   private txVK: VK
-  public tree: MerkleTree
-  public txs: TxStorage
+  public poolTree: MerkleTree
+  public optimisticTree: MerkleTree
+  public poolTxs: TxStorage
+  public optimisticTxs: TxStorage
   public chainId: number = 0
   public denominator: BN = toBN(1)
   public isInitialized = false
@@ -52,12 +54,14 @@ class Pool {
     this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
 
     this.treeParams = Params.fromFile(config.treeUpdateParamsPath)
-
     const txVK = require(config.txVKPath)
     this.txVK = txVK
 
-    this.tree = new MerkleTree('./tree.db')
-    this.txs = new TxStorage('./txs.db')
+    this.poolTree = new MerkleTree('./poolTree.db')
+    this.poolTxs = new TxStorage('./poolTxs.db')
+
+    this.optimisticTree = new MerkleTree('./optimisticTree.db')
+    this.optimisticTxs = new TxStorage('./optimisticTxs.db')
   }
 
   async init() {
@@ -76,10 +80,11 @@ class Pool {
     )
 
     const buf = Buffer.from(rawMemo, 'hex')
-    const { fee, nativeAmount } = getTxData(buf, txType)
+    const txData = getTxData(buf, txType)
+    const nativeAmount = txType === TxType.WITHDRAWAL ? (txData as WithdrawTxData).nativeAmount : null
 
     await checkAssertion(
-      () => checkFee(fee),
+      () => checkFee(txData.fee),
       `Fee too low`
     )
 
@@ -106,14 +111,14 @@ class Pool {
         txType,
         delta.tokenAmount,
         delta.energyAmount,
-        nativeAmount,
+        txData,
         toBN('0')
       ),
       `Tx specific fields are incorrect`
     )
 
     // TODO maybe store memo in redis as a path to a file
-    const job = await txQueue.add('test-tx', {
+    const job = await poolTxQueue.add('tx', {
       to: config.poolAddress,
       amount: '0',
       gas: config.relayerGasLimit.toString(),
@@ -126,13 +131,13 @@ class Pool {
     return job.id
   }
 
-  getVirtualTreeProof(outCommit: string, transferNum: number) {
+  getOptimisticVirtualTreeProof(outCommit: string, transferNum: number) {
     logger.debug(`Building virtual tree proof...`)
     const nextCommitIndex = Math.floor(transferNum / OUTPLUSONE)
     const prevCommitIndex = nextCommitIndex - 1
 
-    const root_before = this.tree.getRoot()
-    const root_after = this.tree.getVirtualNode(
+    const root_before = this.optimisticTree.getRoot()
+    const root_after = this.optimisticTree.getVirtualNode(
       Constants.HEIGHT,
       0,
       [[[Constants.OUTLOG, nextCommitIndex], outCommit]],
@@ -140,11 +145,11 @@ class Pool {
       transferNum + OUTPLUSONE
     )
 
-    const proof_filled = this.tree.getCommitmentProof(prevCommitIndex)
-    const proof_free = this.tree.getCommitmentProof(nextCommitIndex)
+    const proof_filled = this.optimisticTree.getCommitmentProof(prevCommitIndex)
+    const proof_free = this.optimisticTree.getCommitmentProof(nextCommitIndex)
 
     const leaf = outCommit
-    const prev_leaf = this.tree.getNode(Constants.OUTLOG, prevCommitIndex)
+    const prev_leaf = this.optimisticTree.getNode(Constants.OUTLOG, prevCommitIndex)
 
     logger.debug(`Virtual root ${root_after}; Commit ${outCommit}; Index ${nextCommitIndex}`)
 
@@ -173,11 +178,12 @@ class Pool {
   }
 
   addCommitment(index: number, commit: Buffer) {
-    this.tree.addCommitment(index, commit)
+    this.poolTree.addCommitment(index, commit)
+    this.optimisticTree.addCommitment(index, commit)
   }
 
   getDbTx(i: number): [string, string] | null {
-    const buf = this.txs.get(i)
+    const buf = this.poolTxs.get(i)
     if (!buf) return null
     const data = buf.toString()
     const out_commit = data.slice(0, 64)
@@ -195,14 +201,15 @@ class Pool {
       logger.debug('ROOT MISMATCH')
 
       // Zero out existing hashes
-      const nextIndex = this.tree.getNextIndex()
+      const nextIndex = this.poolTree.getNextIndex()
       for (let i = 0; i < nextIndex; i++) {
         const emptyHash = Buffer.alloc(32)
-        this.tree.addHash(i, emptyHash)
+        this.poolTree.addHash(i, emptyHash)
+        this.optimisticTree.addHash(i, emptyHash)
       }
       // Clear tx storage
       for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
-        this.txs.delete(i)
+        this.poolTxs.delete(i)
       }
 
       const events = await getEvents(this.PoolInstance, 'Message', { fromBlock })
@@ -229,10 +236,10 @@ class Pool {
         const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
 
         const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-        const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
+        const commitAndMemo = numToHex(toBN(outCommit)).concat(transactionHash.slice(2)).concat(truncatedMemo)
 
         this.addCommitment(txNum, Helpers.strToNum(outCommit))
-        pool.txs.add(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
+        pool.poolTxs.add(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
       }
 
       await updateField(RelayerKeys.TRANSFER_NUM, events.length * OUTPLUSONE)
@@ -264,20 +271,24 @@ class Pool {
   }
 
   getLocalMerkleRoot(): string {
-    return this.tree.getRoot()
+    return this.optimisticTree.getRoot()
   }
 
   getMerkleProof(noteIndex: number): MerkleProof {
     logger.debug(`Merkle proof for index ${noteIndex}`)
-    return this.tree.getProof(noteIndex)
+    return this.optimisticTree.getProof(noteIndex)
   }
 
   async getTransactions(limit: number, offset: number) {
-    await this.syncState()
+    // await this.syncState()
+    const localRoot = this.poolTree.getRoot()
+    const index = this.poolTree.getNextIndex() - OUTPLUSONE
+    const contractMerkleRoot = await this.getContractMerkleRoot(index.toString())
+    
     const txs: string[] = []
     offset = Math.floor(offset / OUTPLUSONE) * OUTPLUSONE
     for (let i = 0; i < limit; i++) {
-      const tx = this.txs.get(offset + i * OUTPLUSONE)
+      const tx = this.optimisticTxs.get(offset + i * OUTPLUSONE)
       if (tx) {
         txs[i] = tx.toString('hex')
       } else {

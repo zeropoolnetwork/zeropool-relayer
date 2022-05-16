@@ -1,6 +1,6 @@
 import BN from 'bn.js'
 import { toBN } from 'web3-utils'
-import { TxType } from 'zp-memo-parser'
+import { TxType, TxData, WithdrawTxData } from 'zp-memo-parser'
 import { Helpers, Proof } from 'libzeropool-rs-node'
 import { logger } from './services/appLogger'
 import { config } from './config/config'
@@ -32,8 +32,8 @@ export function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
   return transferIndex.lte(contractPoolIndex)
 }
 
-export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, nativeAmount: BN | null, msgValue: BN) {
-  logger.debug(`TOKENS ${tokenAmount.toString()}, ENERGY ${energyAmount.toString()}, MEMO NATIVE ${nativeAmount?.toString()}, MSG VALUE ${msgValue.toString()}`)
+export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, txData: TxData, msgValue: BN) {
+  logger.debug('TOKENS %O, ENERGY %O, TX DATA %O, MSG VALUE %O', tokenAmount, energyAmount, txData, msgValue)
   let isValid = false
   if (txType === TxType.DEPOSIT) {
     isValid =
@@ -46,11 +46,11 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
       energyAmount.eq(ZERO) &&
       msgValue.eq(ZERO)
   } else if (txType === TxType.WITHDRAWAL) {
+    const nativeAmount = (txData as WithdrawTxData).nativeAmount
     isValid =
       tokenAmount.lte(ZERO) &&
       energyAmount.lte(ZERO)
-    if (nativeAmount)
-      isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
+    isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
   return isValid
 }
