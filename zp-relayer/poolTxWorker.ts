@@ -79,10 +79,10 @@ export async function createPoolTxWorker() {
     const commitAndMemo = numToHex(toBN(outCommit)).concat(txHash.slice(2)).concat(truncatedMemo)
   
     logger.debug(`${logPrefix} Updating tree`)
-    pool.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
+    pool.state.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
   
     logger.debug(`${logPrefix} Adding tx to storage`)
-    pool.optimisticTxs.add(contractTransferIndex, Buffer.from(commitAndMemo, 'hex'))
+    pool.optimisticState.addTx(contractTransferIndex, Buffer.from(commitAndMemo, 'hex'))
 
     await sentTxQueue.add(txHash, {
       payload: job.data,

@@ -61,7 +61,7 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
     return
   }
 
-  const txs = await pool.getTransactions(limit, offset)
+  const txs = await pool.state.getTransactions(limit, offset)
   res.json(txs)
 }
 
@@ -81,8 +81,8 @@ async function getJob(req: Request, res: Response) {
 }
 
 function relayerInfo(req: Request, res: Response) {
-  const deltaIndex = pool.poolTree.getNextIndex()
-  const root = pool.getLocalMerkleRoot()
+  const deltaIndex = pool.state.getNextIndex()
+  const root = pool.state.getMerkleRoot()
 
   res.json({
     root,

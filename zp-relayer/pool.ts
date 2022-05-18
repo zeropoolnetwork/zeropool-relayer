@@ -10,17 +10,13 @@ import { poolTxQueue } from './services/poolTxQueue'
 import { OUTPLUSONE } from './utils/constants'
 import { getEvents, getTransaction, getChainId } from './utils/web3'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
-import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
+import { updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import {
   Params,
   TreePub,
   TreeSec,
   Proof,
-  MerkleTree,
-  TxStorage,
-  MerkleProof,
-  Constants,
   SnarkProof,
   VK,
   Helpers,
@@ -35,6 +31,7 @@ import {
   checkTxSpecificFields,
   parseDelta,
 } from './validation'
+import { PoolState } from './state'
 
 import { getTxData, TxType, WithdrawTxData } from 'zp-memo-parser'
 
@@ -42,10 +39,8 @@ class Pool {
   public PoolInstance: Contract
   private treeParams: Params
   private txVK: VK
-  public poolTree: MerkleTree
-  public optimisticTree: MerkleTree
-  public poolTxs: TxStorage
-  public optimisticTxs: TxStorage
+  public state: PoolState
+  public optimisticState: PoolState
   public chainId: number = 0
   public denominator: BN = toBN(1)
   public isInitialized = false
@@ -57,11 +52,8 @@ class Pool {
     const txVK = require(config.txVKPath)
     this.txVK = txVK
 
-    this.poolTree = new MerkleTree('./poolTree.db')
-    this.poolTxs = new TxStorage('./poolTxs.db')
-
-    this.optimisticTree = new MerkleTree('./optimisticTree.db')
-    this.optimisticTxs = new TxStorage('./optimisticTxs.db')
+    this.state = new PoolState('pool')
+    this.optimisticState = new PoolState('optimistic')
   }
 
   async init() {
@@ -131,85 +123,24 @@ class Pool {
     return job.id
   }
 
-  getOptimisticVirtualTreeProof(outCommit: string, transferNum: number) {
-    logger.debug(`Building virtual tree proof...`)
-    const nextCommitIndex = Math.floor(transferNum / OUTPLUSONE)
-    const prevCommitIndex = nextCommitIndex - 1
-
-    const root_before = this.optimisticTree.getRoot()
-    const root_after = this.optimisticTree.getVirtualNode(
-      Constants.HEIGHT,
-      0,
-      [[[Constants.OUTLOG, nextCommitIndex], outCommit]],
-      transferNum,
-      transferNum + OUTPLUSONE
-    )
-
-    const proof_filled = this.optimisticTree.getCommitmentProof(prevCommitIndex)
-    const proof_free = this.optimisticTree.getCommitmentProof(nextCommitIndex)
-
-    const leaf = outCommit
-    const prev_leaf = this.optimisticTree.getNode(Constants.OUTLOG, prevCommitIndex)
-
-    logger.debug(`Virtual root ${root_after}; Commit ${outCommit}; Index ${nextCommitIndex}`)
-
-    logger.debug('Proving tree...')
-    const treePub = {
-      root_before,
-      root_after,
-      leaf,
-    }
-    const treeSec = {
-      proof_filled,
-      proof_free,
-      prev_leaf,
-    }
-    const proof = Proof.tree(
-      this.treeParams,
-      treePub,
-      treeSec
-    )
-    logger.debug('Tree proved')
-
-    return {
-      proof,
-      nextCommitIndex,
-    }
-  }
-
-  addCommitment(index: number, commit: Buffer) {
-    this.poolTree.addCommitment(index, commit)
-    this.optimisticTree.addCommitment(index, commit)
-  }
-
-  getDbTx(i: number): [string, string] | null {
-    const buf = this.poolTxs.get(i)
-    if (!buf) return null
-    const data = buf.toString()
-    const out_commit = data.slice(0, 64)
-    const memo = data.slice(64)
-    return [out_commit, memo]
-  }
-
   async syncState(fromBlock: number | string = 'earliest') {
     logger.debug('Syncing state...')
     const contractRoot = await this.getContractMerkleRoot(null)
-    let localRoot = this.getLocalMerkleRoot()
+    let localRoot = this.state.getMerkleRoot()
     logger.debug(`LATEST CONTRACT ROOT ${contractRoot}`)
     logger.debug(`LATEST LOCAL ROOT ${localRoot}`)
     if (contractRoot !== localRoot) {
       logger.debug('ROOT MISMATCH')
 
       // Zero out existing hashes
-      const nextIndex = this.poolTree.getNextIndex()
+      const nextIndex = this.state.getNextIndex()
       for (let i = 0; i < nextIndex; i++) {
         const emptyHash = Buffer.alloc(32)
-        this.poolTree.addHash(i, emptyHash)
-        this.optimisticTree.addHash(i, emptyHash)
+        this.state.addHash(i, emptyHash)
       }
       // Clear tx storage
       for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
-        this.poolTxs.delete(i)
+        this.state.deleteTx(i)
       }
 
       const events = await getEvents(this.PoolInstance, 'Message', { fromBlock })
@@ -238,20 +169,28 @@ class Pool {
         const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
         const commitAndMemo = numToHex(toBN(outCommit)).concat(transactionHash.slice(2)).concat(truncatedMemo)
 
-        this.addCommitment(txNum, Helpers.strToNum(outCommit))
-        pool.poolTxs.add(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
+        this.state.addCommitment(txNum, Helpers.strToNum(outCommit))
+        this.state.addTx(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
       }
 
       await updateField(RelayerKeys.TRANSFER_NUM, events.length * OUTPLUSONE)
 
-      localRoot = this.getLocalMerkleRoot()
+      localRoot = this.state.getMerkleRoot()
       logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
     }
   }
 
-  getTreeProof(pub: TreePub, sec: TreeSec): Proof {
-    return Proof.tree(this.treeParams, pub, sec)
+  async getTreeProof(pub: TreePub, sec: TreeSec) {
+    logger.debug('Proving tree...')
+    const proof = await Proof.treeAsync(
+      this.treeParams,
+      pub,
+      sec
+    )
+    logger.debug('Tree proved')
+    return proof
   }
+
 
   verifyProof(proof: SnarkProof, inputs: Array<string>) {
     return Proof.verify(this.txVK, proof, inputs)
@@ -268,34 +207,6 @@ class Pool {
     }
     const root = await this.PoolInstance.methods.roots(index).call()
     return root.toString()
-  }
-
-  getLocalMerkleRoot(): string {
-    return this.optimisticTree.getRoot()
-  }
-
-  getMerkleProof(noteIndex: number): MerkleProof {
-    logger.debug(`Merkle proof for index ${noteIndex}`)
-    return this.optimisticTree.getProof(noteIndex)
-  }
-
-  async getTransactions(limit: number, offset: number) {
-    // await this.syncState()
-    const localRoot = this.poolTree.getRoot()
-    const index = this.poolTree.getNextIndex() - OUTPLUSONE
-    const contractMerkleRoot = await this.getContractMerkleRoot(index.toString())
-    
-    const txs: string[] = []
-    offset = Math.floor(offset / OUTPLUSONE) * OUTPLUSONE
-    for (let i = 0; i < limit; i++) {
-      const tx = this.optimisticTxs.get(offset + i * OUTPLUSONE)
-      if (tx) {
-        txs[i] = tx.toString('hex')
-      } else {
-        break;
-      }
-    }
-    return txs
   }
 }
 

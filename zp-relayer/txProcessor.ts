@@ -1,16 +1,14 @@
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
-import { web3 } from './services/web3'
 import { Job, Worker } from 'bullmq'
 import Contract from 'web3-eth-contract'
 import { logger } from './services/appLogger'
 import { redis } from './services/redisClient'
 import { TxPayload } from './services/poolTxQueue'
-import { TX_QUEUE_NAME, OUTPLUSONE, TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE, } from './utils/constants'
+import { TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE, } from './utils/constants'
 import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
-import { numToHex, flattenProof, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
-import { signAndSend } from './tx/signAndSend'
-import { Helpers, SnarkProof } from 'libzeropool-rs-node'
+import { numToHex, flattenProof, truncateHexPrefix } from './utils/helpers'
+import { SnarkProof } from 'libzeropool-rs-node'
 import { pool } from './pool'
 import { TxType } from 'zp-memo-parser'
 
@@ -91,9 +89,12 @@ export async function processTx(job: Job<TxPayload>) {
 
   const outCommit = txProof.inputs[2]
   const {
-    proof: treeProof,
+    pub,
+    sec,
     nextCommitIndex
-  } = pool.getOptimisticVirtualTreeProof(outCommit, contractTransferIndex)
+  } = pool.optimisticState.getVirtualTreeProofInputs(outCommit, contractTransferIndex)
+
+  const treeProof = await pool.getTreeProof(pub, sec)
 
   const data = buildTxData(
     txProof.proof,
