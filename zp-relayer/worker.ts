@@ -129,7 +129,7 @@ async function processTx(job: Job<TxPayload>) {
   await updateField(RelayerKeys.TRANSFER_NUM, contractTransferIndex + OUTPLUSONE)
 
   const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
-  const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
+  const commitAndMemo = numToHex(toBN(outCommit)).concat(txHash.slice(2)).concat(truncatedMemo)
 
   logger.debug(`${logPrefix} Updating tree`)
   pool.addCommitment(nextCommitIndex, Helpers.strToNum(outCommit))
