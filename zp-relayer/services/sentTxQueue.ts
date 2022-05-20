@@ -9,6 +9,8 @@ import type { TransactionConfig} from 'web3-core'
 
 export interface SentTxPayload {
   payload: TxPayload
+  outCommit: string
+  commitIndex: number
   txHash: string
   txConfig: TransactionConfig
 }

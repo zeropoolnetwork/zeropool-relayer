@@ -1,9 +1,6 @@
-import './env'
 import { logger } from './services/appLogger'
 import { OUTPLUSONE } from './utils/constants'
 import {
-  TreePub,
-  TreeSec,
   MerkleTree,
   TxStorage,
   MerkleProof,
@@ -11,16 +8,19 @@ import {
 } from 'libzeropool-rs-node'
 
 export class PoolState {
-  public tree: MerkleTree
-  public txs: TxStorage
+  private tree: MerkleTree
+  private txs: TxStorage
 
   constructor(name: string) {
     this.tree = new MerkleTree(`./${name}Tree.db`)
     this.txs = new TxStorage(`./${name}Txs.db`)
   }
 
-  getVirtualTreeProofInputs(outCommit: string, transferNum: number) {
+  getVirtualTreeProofInputs(outCommit: string, transferNum?: number) {
     logger.debug(`Building virtual tree proof...`)
+
+    if (!transferNum) transferNum = this.getNextIndex()
+
     const nextCommitIndex = Math.floor(transferNum / OUTPLUSONE)
     const prevCommitIndex = nextCommitIndex - 1
 
@@ -55,12 +55,16 @@ export class PoolState {
     return {
       pub: treePub,
       sec: treeSec,
-      nextCommitIndex
+      commitIndex: nextCommitIndex
     }
   }
 
   addCommitment(index: number, commit: Buffer) {
     this.tree.addCommitment(index, commit)
+  }
+
+  getCommitment(index: number) {
+    return this.tree.getNode(Constants.OUTLOG, index)
   }
 
   addHash(i: number, hash: Buffer) {

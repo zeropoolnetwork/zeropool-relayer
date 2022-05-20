@@ -14,8 +14,6 @@ import { updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import {
   Params,
-  TreePub,
-  TreeSec,
   Proof,
   SnarkProof,
   VK,
@@ -37,7 +35,7 @@ import { getTxData, TxType, WithdrawTxData } from 'zp-memo-parser'
 
 class Pool {
   public PoolInstance: Contract
-  private treeParams: Params
+  public treeParams: Params
   private txVK: VK
   public state: PoolState
   public optimisticState: PoolState
@@ -57,6 +55,8 @@ class Pool {
   }
 
   async init() {
+    if (this.isInitialized) return
+
     this.chainId = await getChainId(web3)
     this.denominator = toBN(await this.PoolInstance.methods.denominator().call())
     await this.syncState()
@@ -109,9 +109,7 @@ class Pool {
       `Tx specific fields are incorrect`
     )
 
-    // TODO maybe store memo in redis as a path to a file
     const job = await poolTxQueue.add('tx', {
-      to: config.poolAddress,
       amount: '0',
       gas: config.relayerGasLimit.toString(),
       txProof,
@@ -180,18 +178,6 @@ class Pool {
     }
   }
 
-  async getTreeProof(pub: TreePub, sec: TreeSec) {
-    logger.debug('Proving tree...')
-    const proof = await Proof.treeAsync(
-      this.treeParams,
-      pub,
-      sec
-    )
-    logger.debug('Tree proved')
-    return proof
-  }
-
-
   verifyProof(proof: SnarkProof, inputs: Array<string>) {
     return Proof.verify(this.txVK, proof, inputs)
   }
@@ -211,3 +197,4 @@ class Pool {
 }
 
 export const pool = new Pool()
+export type { Pool }
