@@ -38,8 +38,10 @@ export async function syncAccounts(accounts: UserAccount[], relayerUrl = relayer
 
 export async function syncNotesAndAccount(account: UserAccount, relayerUrl = relayerUrlFirst, numTxs = 20n, offset = 0n) {
   const txs = await fetch(
-    `${relayerUrl}/transactions?limit=${numTxs.toString()}&offset=${offset.toString()}`
+    `${relayerUrl}/transactions?limit=${numTxs.toString()}&offset=${offset.toString()}&optimistic=true`
   ).then(r => r.json())
+
+  console.log(`Received ${txs.length} transactions`)
 
   // Extract user's accounts and notes from memo blocks
   for (let txNum = 0; txNum <= txs.length; txNum++) {
@@ -59,7 +61,7 @@ export async function syncNotesAndAccount(account: UserAccount, relayerUrl = rel
     console.log('Memo commit', Helpers.numToStr(commitment))
     account.addCommitment(BigInt(txNum), commitment)
 
-    const memo = new Uint8Array(buf.buffer.slice(32))
+    const memo = new Uint8Array(buf.buffer.slice(64))
 
     console.log(memo.toString().slice(0, 100))
     console.log(memo.length)

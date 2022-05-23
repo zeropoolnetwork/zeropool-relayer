@@ -13,6 +13,8 @@ import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
 import { toWei } from 'web3-utils'
 import { config } from './config/config'
+import { RelayerWorker } from './relayerWorker'
+import { redis } from './services/redisClient'
 
 const {
   RELAYER_ADDRESS_PRIVATE_KEY,
@@ -21,32 +23,31 @@ const {
 
 const token = 'RELAYER'
 
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+export class PoolTxWorker extends RelayerWorker {
+  constructor() {
+    const poolTxQueueWorker = new Worker<TxPayload>(TX_QUEUE_NAME, undefined, {
+      connection: redis
+    })
+    super('pool-tx', 500, poolTxQueueWorker)
+  }
 
-export async function createPoolTxWorker() {
-  logger.info('Started poolTxWorker')
+  async init() {
+    await updateField(RelayerKeys.NONCE, await readNonce(true))
+    await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
 
-  // Reset nonce
-  await updateField(RelayerKeys.NONCE, await readNonce(true))
-  await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
+    await pool.init()
+  }
 
-  await pool.init()
-
-  const poolTxQueueWorker = new Worker<TxPayload>(TX_QUEUE_NAME)
-
-  while (true) {
-    await sleep(500)
+  async run() {
     const sentTxNum = await sentTxQueue.count()
-    if (sentTxNum > MAX_SENT_LIMIT) continue
+    if (sentTxNum > MAX_SENT_LIMIT) return
 
-    const job: Job<TxPayload> | undefined = await poolTxQueueWorker.getNextJob(token)
+    const job: Job<TxPayload> | undefined = await this.internalWorker.getNextJob(token)
 
-    if (!job) continue
+    if (!job) return
 
     const logPrefix = `POOL WORKER: Job ${job.id}:`
-    logger.info('%s: processing...', logPrefix)
+    logger.info('%s processing...', logPrefix)
 
     const { data, commitIndex } = await processTx(job, pool)
     const { gas, amount, rawMemo, txType, txProof } = job.data
@@ -69,16 +70,18 @@ export async function createPoolTxWorker() {
     logger.debug(`${logPrefix} TX hash ${txHash}`)
 
     await updateField(RelayerKeys.NONCE, nonce + 1)
-    await updateField(RelayerKeys.TRANSFER_NUM, commitIndex + OUTPLUSONE)
+    await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
 
     const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
-    const commitAndMemo = numToHex(toBN(outCommit)).concat(txHash.slice(2)).concat(truncatedMemo)
+    const txData = numToHex(toBN(outCommit))
+      .concat(txHash.slice(2))
+      .concat(truncatedMemo)
 
     logger.debug(`${logPrefix} Updating optimistic tree`)
     pool.optimisticState.addCommitment(commitIndex, Helpers.strToNum(outCommit))
 
     logger.debug(`${logPrefix} Adding tx to storage`)
-    pool.optimisticState.addTx(commitIndex, Buffer.from(commitAndMemo, 'hex'))
+    pool.optimisticState.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
 
     await sentTxQueue.add(txHash, {
       payload: job.data,
@@ -90,5 +93,7 @@ export async function createPoolTxWorker() {
       {
         delay: TX_CHECK_DELAY
       })
+
+    await job.moveToCompleted('processed', token)
   }
 }

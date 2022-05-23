@@ -7,13 +7,11 @@ import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { Helpers } from 'libzeropool-rs-node'
 import { pool } from './pool'
 import { SentTxPayload } from './services/sentTxQueue'
+import { RelayerWorker } from './relayerWorker'
+import { redis } from './services/redisClient'
 
 const token = 'RELAYER'
 const MAX_SENT_LIMIT = 10
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 async function collectBatch<T>(worker: Worker<T>, maxSize: number) {
   const jobs: Job<T>[] = []
@@ -25,21 +23,23 @@ async function collectBatch<T>(worker: Worker<T>, maxSize: number) {
   return jobs
 }
 
-export async function createSentTxWorker() {
-  // Reset nonce
-  // await readNonce(true)
-  await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
+export class SentTxWorker extends RelayerWorker {
+  constructor() {
+    const sentTxQueueWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, undefined, {
+      connection: redis
+    })
+    super('sent-tx', 500, sentTxQueueWorker)
+  }
 
-  await pool.init()
+  async init() {
+    await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
+    await pool.init()
+  }
 
-  const sentTxQueueWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME)
+  async run() {
+    const job: Job<SentTxPayload> | undefined = await this.internalWorker.getNextJob(token)
 
-  while (true) {
-    await sleep(500)
-
-    const job: Job<SentTxPayload> | undefined = await sentTxQueueWorker.getNextJob(token)
-
-    if (!job) continue
+    if (!job) return
 
     const logPrefix = `SENT WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
@@ -61,9 +61,10 @@ export async function createSentTxWorker() {
         const node2 = pool.optimisticState.getCommitment(commitIndex)
         logger.info(`Assert nodes are equal: ${node1}, ${node2}, ${node1 === node2}`)
 
+        await job.moveToCompleted('mined', token)
       } else { // Revert
         logger.debug('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
-        const failTxs = await collectBatch(sentTxQueueWorker, MAX_SENT_LIMIT + 1)
+        const failTxs = await collectBatch(this.internalWorker, MAX_SENT_LIMIT + 1)
         for (const failTxJob of failTxs) {
           const newJob = await poolTxQueue.add('tx', failTxJob.data.payload)
           logger.debug('%s Moved job %s to main queue: %s', logPrefix, failTxJob.id, newJob.id)

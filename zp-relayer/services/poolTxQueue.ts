@@ -5,7 +5,6 @@ import { Proof } from 'libzeropool-rs-node'
 import { TxType } from 'zp-memo-parser'
 
 export interface TxPayload {
-  to: string
   amount: string
   gas: string | number
   txProof: Proof

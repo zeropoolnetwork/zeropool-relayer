@@ -4,13 +4,13 @@ import cors from 'cors'
 import express from 'express'
 import { logger } from './services/appLogger'
 import { createLoggerMiddleware } from './services/loggerMiddleware'
-import { createPoolTxWorker } from './poolTxWorker'
-import { createSentTxWorker } from './sentTxWorker'
+import { PoolTxWorker } from './poolTxWorker'
+import { SentTxWorker } from './sentTxWorker'
 import endpoints from './endpoints'
 import { config } from './config/config'
 
-createPoolTxWorker()
-createSentTxWorker()
+new PoolTxWorker().start()
+new SentTxWorker().start()
 
 const {
   TX_PROOFS_DIR,

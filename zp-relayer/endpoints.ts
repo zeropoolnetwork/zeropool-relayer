@@ -50,6 +50,7 @@ async function merkleRoot(req: Request, res: Response, next: NextFunction) {
 
 async function getTransactions(req: Request, res: Response, next: NextFunction) {
   const limit = Number(req.query.limit as string || '100')
+  const isOptimistic = req.query.optimistic === 'true'
   if (isNaN(limit) || limit <= 0) {
     next(new Error("limit must be a positive number"))
     return
@@ -61,7 +62,8 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
     return
   }
 
-  const txs = await pool.state.getTransactions(limit, offset)
+  const state = isOptimistic ? pool.optimisticState : pool.state
+  const txs = await state.getTransactions(limit, offset)
   res.json(txs)
 }
 
