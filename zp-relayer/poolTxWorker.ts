@@ -21,9 +21,7 @@ const {
   GAS_PRICE,
 } = process.env as Record<PropertyKey, string>
 
-const token = 'RELAYER'
-
-export class PoolTxWorker extends RelayerWorker {
+export class PoolTxWorker extends RelayerWorker<TxPayload> {
   constructor() {
     const poolTxQueueWorker = new Worker<TxPayload>(TX_QUEUE_NAME, undefined, {
       connection: redis
@@ -38,14 +36,13 @@ export class PoolTxWorker extends RelayerWorker {
     await pool.init()
   }
 
-  async run() {
+  async checkPreconditions() {
     const sentTxNum = await sentTxQueue.count()
-    if (sentTxNum > MAX_SENT_LIMIT) return
+    if (sentTxNum > MAX_SENT_LIMIT) return false
+    return true
+  }
 
-    const job: Job<TxPayload> | undefined = await this.internalWorker.getNextJob(token)
-
-    if (!job) return
-
+  async run(job: Job<TxPayload>) {
     const logPrefix = `POOL WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
 
@@ -94,6 +91,6 @@ export class PoolTxWorker extends RelayerWorker {
         delay: TX_CHECK_DELAY
       })
 
-    await job.moveToCompleted('processed', token)
+    return txHash
   }
 }

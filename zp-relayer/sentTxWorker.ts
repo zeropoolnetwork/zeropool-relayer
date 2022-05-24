@@ -23,7 +23,7 @@ async function collectBatch<T>(worker: Worker<T>, maxSize: number) {
   return jobs
 }
 
-export class SentTxWorker extends RelayerWorker {
+export class SentTxWorker extends RelayerWorker<SentTxPayload> {
   constructor() {
     const sentTxQueueWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, undefined, {
       connection: redis
@@ -36,11 +36,11 @@ export class SentTxWorker extends RelayerWorker {
     await pool.init()
   }
 
-  async run() {
-    const job: Job<SentTxPayload> | undefined = await this.internalWorker.getNextJob(token)
+  async checkPreconditions(): Promise<boolean> {
+    return true
+  }
 
-    if (!job) return
-
+  async run(job: Job<SentTxPayload>) {
     const logPrefix = `SENT WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
 
@@ -61,7 +61,7 @@ export class SentTxWorker extends RelayerWorker {
         const node2 = pool.optimisticState.getCommitment(commitIndex)
         logger.info(`Assert nodes are equal: ${node1}, ${node2}, ${node1 === node2}`)
 
-        await job.moveToCompleted('mined', token)
+        return txHash
       } else { // Revert
         logger.debug('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
         const failTxs = await collectBatch(this.internalWorker, MAX_SENT_LIMIT + 1)
