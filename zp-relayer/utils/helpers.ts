@@ -9,7 +9,8 @@ export function toTxType(t: string): TxType {
   if (
     t === TxType.DEPOSIT ||
     t === TxType.TRANSFER ||
-    t === TxType.WITHDRAWAL
+    t === TxType.WITHDRAWAL ||
+    t === TxType.PERMITTABLE_DEPOSIT
   ) {
     return t
   } else {
@@ -19,7 +20,7 @@ export function toTxType(t: string): TxType {
 
 export function truncateMemoTxPrefix(memo: string, txType: TxType) {
   // 16 + 16 + 40
-  const txSpecificPrefixLen = txType === TxType.WITHDRAWAL ? 72 : 16
+  const txSpecificPrefixLen = (txType === TxType.WITHDRAWAL || txType === TxType.PERMITTABLE_DEPOSIT) ? 72 : 16
   return memo.slice(txSpecificPrefixLen)
 }
 
