@@ -7,7 +7,7 @@ import { TX_QUEUE_NAME, OUTPLUSONE, TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE
 import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
-import { Helpers } from 'libzeropool-rs-node'
+import { Helpers } from 'libzkbob-rs-node'
 import { pool } from './pool'
 import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
@@ -32,8 +32,6 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
   async init() {
     await updateField(RelayerKeys.NONCE, await readNonce(true))
     await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
-
-    await pool.init()
   }
 
   async checkPreconditions() {
@@ -75,6 +73,7 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
       .concat(truncatedMemo)
 
     logger.debug(`${logPrefix} Updating optimistic tree`)
+    console.log('COMMIT INDEX', commitIndex)
     pool.optimisticState.addCommitment(commitIndex, Helpers.strToNum(outCommit))
 
     logger.debug(`${logPrefix} Adding tx to storage`)

@@ -8,9 +8,12 @@ import { PoolTxWorker } from './poolTxWorker'
 import { SentTxWorker } from './sentTxWorker'
 import endpoints from './endpoints'
 import { config } from './config/config'
+import { pool } from './pool'
 
-new PoolTxWorker().start()
-new SentTxWorker().start()
+pool.init().then(() => {
+  new PoolTxWorker().start()
+  new SentTxWorker().start()
+})
 
 const {
   TX_PROOFS_DIR,

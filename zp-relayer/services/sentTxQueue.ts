@@ -1,8 +1,6 @@
 import { Queue, QueueScheduler } from 'bullmq'
 import { redis } from './redisClient'
 import { SENT_TX_QUEUE_NAME } from '../utils/constants'
-import { Proof } from 'libzeropool-rs-node'
-import { TxType } from 'zp-memo-parser'
 import { TxPayload } from './poolTxQueue'
 import type { TransactionConfig} from 'web3-core'
 

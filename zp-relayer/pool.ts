@@ -7,18 +7,14 @@ import { config } from './config/config'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
-import { OUTPLUSONE } from './utils/constants'
-import { getEvents, getTransaction, getChainId } from './utils/web3'
-import { PoolCalldataParser } from './utils/PoolCalldataParser'
-import { updateField, RelayerKeys } from './utils/redisFields'
-import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
+import { getChainId, getEvents, getTransaction } from './utils/web3'
 import {
+  Helpers,
   Params,
   Proof,
   SnarkProof,
   VK,
-  Helpers,
-} from 'libzeropool-rs-node'
+} from 'libzkbob-rs-node'
 import {
   checkAssertion,
   checkNativeAmount,
@@ -32,6 +28,9 @@ import {
 import { PoolState } from './state'
 
 import { getTxData, TxType, WithdrawTxData } from 'zp-memo-parser'
+import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
+import { PoolCalldataParser } from './utils/PoolCalldataParser'
+import { OUTPLUSONE } from './utils/constants'
 
 class Pool {
   public PoolInstance: Contract
@@ -90,7 +89,7 @@ class Pool {
       `Incorrect transfer proof`
     )
 
-    const contractTransferIndex = await this.getContractTransferNum()
+    const contractTransferIndex = await this.getContractIndex()
     const delta = parseDelta(txProof.inputs[3])
 
     await checkAssertion(
@@ -123,73 +122,86 @@ class Pool {
 
   async syncState(fromBlock: number | string = 'earliest') {
     logger.debug('Syncing state...')
-    const contractRoot = await this.getContractMerkleRoot(null)
-    let localRoot = this.state.getMerkleRoot()
-    logger.debug(`LATEST CONTRACT ROOT ${contractRoot}`)
-    logger.debug(`LATEST LOCAL ROOT ${localRoot}`)
-    if (contractRoot !== localRoot) {
-      logger.debug('ROOT MISMATCH')
 
-      // Zero out existing hashes
-      const nextIndex = this.state.getNextIndex()
-      for (let i = 0; i < nextIndex; i++) {
-        const emptyHash = Buffer.alloc(32)
-        this.state.addHash(i, emptyHash)
-      }
-      // Clear tx storage
-      for (let i = 0; i < nextIndex; i += OUTPLUSONE) {
-        this.state.deleteTx(i)
-      }
+    const localIndex = this.state.getNextIndex()
+    const localRoot = this.state.getMerkleRoot()
 
-      const events = await getEvents(this.PoolInstance, 'Message', { fromBlock })
-      for (let txNum = 0; txNum < events.length; txNum++) {
-        const { returnValues, transactionHash } = events[txNum]
+    const contractIndex = await this.getContractIndex()
+    const contractRoot = await this.getContractMerkleRoot(contractIndex)
 
-        const memoString: string = returnValues.message
-        if (!memoString) {
-          throw new Error('incorrect memo in event')
-        }
+    logger.debug(`LOCAL ROOT: ${localRoot}; LOCAL INDEX: ${localIndex}`)
+    logger.debug(`CONTRACT ROOT: ${contractRoot}; CONTRACT INDEX: ${contractIndex}`)
 
-        const { input } = await getTransaction(web3, transactionHash)
-        const calldata = Buffer.from(truncateHexPrefix(input), 'hex')
-
-        const parser = new PoolCalldataParser(calldata)
-
-        const outCommitRaw = parser.getField('outCommit')
-        const outCommit = web3.utils.hexToNumberString(outCommitRaw)
-
-        const txTypeRaw = parser.getField('txType')
-        const txType = toTxType(txTypeRaw)
-
-        const memoSize = web3.utils.hexToNumber(parser.getField('memoSize'))
-        const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
-
-        const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-        const commitAndMemo = numToHex(toBN(outCommit)).concat(transactionHash.slice(2)).concat(truncatedMemo)
-
-        this.state.addCommitment(txNum, Helpers.strToNum(outCommit))
-        this.state.addTx(txNum * OUTPLUSONE, Buffer.from(commitAndMemo, 'hex'))
-      }
-
-      await updateField(RelayerKeys.TRANSFER_NUM, events.length * OUTPLUSONE)
-
-      localRoot = this.state.getMerkleRoot()
-      logger.debug(`LATEST LOCAL ROOT AFTER UPDATE ${localRoot}`)
+    if (contractRoot === localRoot && contractIndex === localIndex) {
+      logger.info('State is ok, no need to resync')
+      return
     }
+
+    const numTxs = Math.floor((contractIndex - localIndex) / OUTPLUSONE)
+    const missedIndices = Array(numTxs)
+    for (let i = 0; i < numTxs; i++) {
+      missedIndices[i] = localIndex + (i + 1) * OUTPLUSONE
+    }
+
+    console.log('MISSED INDICES', missedIndices)
+
+    const events = await getEvents(this.PoolInstance, 'Message', {
+      fromBlock,
+      filter: {
+        index: missedIndices
+      }
+    })
+
+    if (events.length !== missedIndices.length) {
+      logger.error('Not all events found')
+      return
+    }
+
+    for (let i = 0; i < events.length; i++) {
+      const { returnValues, transactionHash } = events[i]
+      const memoString: string = returnValues.message
+      if (!memoString) {
+        throw new Error('incorrect memo in event')
+      }
+
+      const { input } = await getTransaction(web3, transactionHash)
+      const calldata = Buffer.from(truncateHexPrefix(input), 'hex')
+
+      const parser = new PoolCalldataParser(calldata)
+
+      const outCommitRaw = parser.getField('outCommit')
+      const outCommit = web3.utils.hexToNumberString(outCommitRaw)
+
+      const txTypeRaw = parser.getField('txType')
+      const txType = toTxType(txTypeRaw)
+
+      const memoSize = web3.utils.hexToNumber(parser.getField('memoSize'))
+      const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
+
+      const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
+      const commitAndMemo = numToHex(toBN(outCommit)).concat(transactionHash.slice(2)).concat(truncatedMemo)
+
+      const index = Number(returnValues.index) - OUTPLUSONE
+      this.state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit))
+      this.state.addTx(index, Buffer.from(commitAndMemo, 'hex'))
+    }
+
+    logger.debug(`LOCAL ROOT AFTER UPDATE ${this.state.getMerkleRoot()}`)
   }
 
   verifyProof(proof: SnarkProof, inputs: Array<string>) {
     return Proof.verify(this.txVK, proof, inputs)
   }
 
-  async getContractTransferNum() {
-    const transferNum = await pool.PoolInstance.methods.pool_index().call()
-    return Number(transferNum)
+  async getContractIndex() {
+    const poolIndex = await this.PoolInstance.methods.pool_index().call()
+    return Number(poolIndex)
   }
 
-  async getContractMerkleRoot(index: string | undefined | null): Promise<string> {
+  async getContractMerkleRoot(index: string | number | undefined): Promise<string> {
     if (!index) {
-      index = await this.PoolInstance.methods.pool_index().call()
+      index = await this.getContractIndex()
+      console.log('CONTRACT INDEX', index)
     }
     const root = await this.PoolInstance.methods.roots(index).call()
     return root.toString()

@@ -11,7 +11,7 @@ export enum RelayerKeys {
 }
 
 export const readNonce = readFieldBuilder(RelayerKeys.NONCE, () => getNonce(web3, config.relayerAddress))
-export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractTransferNum())
+export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractIndex())
 
 function readFieldBuilder(
   key: RelayerKeys,

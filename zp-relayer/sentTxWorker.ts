@@ -4,7 +4,7 @@ import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { SENT_TX_QUEUE_NAME } from './utils/constants'
 import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
-import { Helpers } from 'libzeropool-rs-node'
+import { Helpers } from 'libzkbob-rs-node'
 import { pool } from './pool'
 import { SentTxPayload } from './services/sentTxQueue'
 import { RelayerWorker } from './relayerWorker'
@@ -33,7 +33,6 @@ export class SentTxWorker extends RelayerWorker<SentTxPayload> {
 
   async init() {
     await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
-    await pool.init()
   }
 
   async checkPreconditions(): Promise<boolean> {

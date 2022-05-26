@@ -5,7 +5,7 @@ import {
   TxStorage,
   MerkleProof,
   Constants,
-} from 'libzeropool-rs-node'
+} from 'libzkbob-rs-node'
 
 export class PoolState {
   private tree: MerkleTree
