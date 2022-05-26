@@ -1,3 +1,4 @@
+import BN from 'bn.js'
 import { Buffer } from 'buffer'
 import { deserialize, BinaryReader } from 'borsh'
 import { toBN } from 'web3-utils'
@@ -8,7 +9,24 @@ export enum TxType {
   DEPOSIT = '0000',
   TRANSFER = '0001',
   WITHDRAWAL = '0002',
+  PERMITTABLE_DEPOSIT = '0003',
 }
+
+interface DefaultTxData {
+  fee: BN,
+}
+
+export interface WithdrawTxData extends DefaultTxData {
+  nativeAmount: BN,
+  reciever: Uint8Array,
+}
+
+export interface PermittableDepositTxData extends DefaultTxData {
+  deadline: BN,
+  holder: Uint8Array,
+}
+
+export type TxData = DefaultTxData | WithdrawTxData | PermittableDepositTxData
 
 // Size in bytes
 const U256_SIZE = 32
@@ -69,7 +87,7 @@ function getNoteHashes(rawHashes: Buffer, num: number, maxNotes: number): Uint8A
   return notes
 }
 
-export function getTxData(data: Buffer, txType: Option<TxType>) {
+export function getTxData(data: Buffer, txType: Option<TxType>): TxData {
   function readU64(offset: number) {
     let uint = data.readBigUInt64BE(offset)
     return toBN(uint.toString())
@@ -81,15 +99,25 @@ export function getTxData(data: Buffer, txType: Option<TxType>) {
   fee = readU64(offset)
   offset += 8
   if (txType === TxType.WITHDRAWAL) {
-    nativeAmount = readU64(offset)
+    const nativeAmount = readU64(offset)
     offset += 8
-    addres = new Uint8Array(data.slice(offset, offset + 20))
+    const reciever = new Uint8Array(data.slice(offset, offset + 20))
+    return {
+      fee,
+      nativeAmount,
+      reciever,
+    }
+  } else if (txType === TxType.PERMITTABLE_DEPOSIT) {
+    const deadline = readU64(offset)
+    offset += 8
+    const holder = new Uint8Array(data.slice(offset, offset + 20))
+    return {
+      fee,
+      deadline,
+      holder,
+    }
   }
-  return {
-    fee,
-    nativeAmount,
-    addres,
-  }
+  return { fee }
 }
 
 export function decodeMemo(data: Buffer, txType: Option<TxType>, maxNotes = 127) {
