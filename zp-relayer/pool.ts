@@ -14,7 +14,7 @@ import {
   Proof,
   SnarkProof,
   VK,
-} from 'libzkbob-rs-node'
+} from 'libzkbob-rs-node-tmp'
 import {
   checkAssertion,
   checkNativeAmount,

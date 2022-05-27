@@ -1,7 +1,7 @@
 import { Queue } from 'bullmq'
 import { redis } from './redisClient'
 import { TX_QUEUE_NAME } from '../utils/constants'
-import { Proof } from 'libzkbob-rs-node'
+import { Proof } from 'libzkbob-rs-node-tmp'
 import { TxType } from 'zp-memo-parser'
 
 export interface TxPayload {

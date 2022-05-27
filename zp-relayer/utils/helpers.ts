@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import { numberToHex, padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
-import { SnarkProof } from 'libzkbob-rs-node'
+import { SnarkProof } from 'libzkbob-rs-node-tmp'
 import { TxType } from 'zp-memo-parser'
 
 export function toTxType(t: string): TxType {
