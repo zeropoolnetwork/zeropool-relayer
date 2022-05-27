@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import { toBN } from 'web3-utils'
-import { TxType, TxData, WithdrawTxData, PermittableDepositTxData } from 'zp-memo-parser'
-import { Helpers, Proof } from 'libzeropool-rs-node'
+import { TxType, TxData, WithdrawTxData } from 'zp-memo-parser'
+import { Helpers, Proof } from 'libzkbob-rs-node-tmp'
 import { logger } from './services/appLogger'
 import { config } from './config/config'
 import { pool } from './pool'
@@ -50,7 +50,7 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
     isValid =
       tokenAmount.lte(ZERO) &&
       energyAmount.lte(ZERO)
-   isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
+    isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
   return isValid
 }

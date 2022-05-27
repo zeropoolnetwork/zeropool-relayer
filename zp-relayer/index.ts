@@ -4,17 +4,22 @@ import cors from 'cors'
 import express from 'express'
 import { logger } from './services/appLogger'
 import { createLoggerMiddleware } from './services/loggerMiddleware'
-import { createTxWorker } from './worker'
+import { PoolTxWorker } from './poolTxWorker'
+import { SentTxWorker } from './sentTxWorker'
 import endpoints from './endpoints'
 import { config } from './config/config'
+import { pool } from './pool'
+
+pool.init().then(() => {
+  new PoolTxWorker().start()
+  new SentTxWorker().start()
+})
 
 const {
   TX_PROOFS_DIR,
 } = process.env as Record<PropertyKey, string>
 
 fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
-
-createTxWorker()
 
 const app = express()
 

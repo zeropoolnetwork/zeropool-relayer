@@ -92,11 +92,8 @@ export function getTxData(data: Buffer, txType: Option<TxType>): TxData {
     let uint = data.readBigUInt64BE(offset)
     return toBN(uint.toString())
   }
-  let fee = null
-  let nativeAmount = null
-  let addres = null
   let offset = 0
-  fee = readU64(offset)
+  const fee = readU64(offset)
   offset += 8
   if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = readU64(offset)
@@ -123,6 +120,7 @@ export function getTxData(data: Buffer, txType: Option<TxType>): TxData {
 export function decodeMemo(data: Buffer, txType: Option<TxType>, maxNotes = 127) {
   const reader = new BinaryReader(data)
   const numItems = new DataView(reader.readFixedArray(4).buffer).getUint32(0, true)
+  console.log('NUM', numItems)
   const memo: Memo = deserialize(clientBorshSchema(numItems - 1), Memo, data.slice(reader.offset))
   memo.numItems = numItems
   memo.noteHashes = getNoteHashes(memo.rawNoteHashes, numItems - 1, maxNotes)

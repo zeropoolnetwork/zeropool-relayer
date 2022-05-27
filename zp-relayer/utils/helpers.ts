@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import { numberToHex, padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
-import { SnarkProof } from 'libzeropool-rs-node'
+import { SnarkProof } from 'libzkbob-rs-node-tmp'
 import { TxType } from 'zp-memo-parser'
 
 export function toTxType(t: string): TxType {
@@ -18,9 +18,16 @@ export function toTxType(t: string): TxType {
   }
 }
 
-export function truncateMemoTxPrefix(memo: string, txType: TxType) {
+const txTypePrefixLen = {
+  [TxType.DEPOSIT]: 16,
+  [TxType.TRANSFER]: 16,
   // 16 + 16 + 40
-  const txSpecificPrefixLen = (txType === TxType.WITHDRAWAL || txType === TxType.PERMITTABLE_DEPOSIT) ? 72 : 16
+  [TxType.WITHDRAWAL]: 72,
+  [TxType.PERMITTABLE_DEPOSIT]: 72,
+}
+
+export function truncateMemoTxPrefix(memo: string, txType: TxType) {
+  const txSpecificPrefixLen = txTypePrefixLen[txType]
   return memo.slice(txSpecificPrefixLen)
 }
 

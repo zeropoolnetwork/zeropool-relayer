@@ -1,7 +1,9 @@
 import Redis from 'ioredis'
 import { logger } from './appLogger'
 
-export const redis = new Redis(process.env.RELAYER_REDIS_URL)
+export const redis = new Redis(process.env.RELAYER_REDIS_URL, {
+  maxRetriesPerRequest: null
+})
 
 redis.on('connect', () => {
   logger.info('Connected to redis')

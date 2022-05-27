@@ -5,7 +5,7 @@ import { decodeMemo } from 'zp-memo-parser'
 import TokenAbi from './token-abi.json'
 import { postData, numToHex, fakeTxProof, packSignature } from './utils'
 import { rpcUrl, relayerUrlFirst, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
-import { UserAccount, UserState, getConstants, Helpers, IWithdrawData, IDepositData, ITransferData } from 'libzeropool-rs-wasm-bundler'
+import { UserAccount, UserState, getConstants, Helpers, IWithdrawData, IDepositData, ITransferData, Proof, Params } from 'libzeropool-rs-wasm-bundler'
 
 export const web3 = new Web3(rpcUrl)
 export const token = new web3.eth.Contract(TokenAbi as any, tokenAddress)
@@ -38,8 +38,10 @@ export async function syncAccounts(accounts: UserAccount[], relayerUrl = relayer
 
 export async function syncNotesAndAccount(account: UserAccount, relayerUrl = relayerUrlFirst, numTxs = 20n, offset = 0n) {
   const txs = await fetch(
-    `${relayerUrl}/transactions/${numTxs.toString()}/${offset.toString()}`
+    `${relayerUrl}/transactions?limit=${numTxs.toString()}&offset=${offset.toString()}&optimistic=true`
   ).then(r => r.json())
+
+  console.log(`Received ${txs.length} transactions`)
 
   // Extract user's accounts and notes from memo blocks
   for (let txNum = 0; txNum <= txs.length; txNum++) {
@@ -49,29 +51,34 @@ export async function syncNotesAndAccount(account: UserAccount, relayerUrl = rel
     // @ts-ignore
     accountToDelta[account] = (txNum + 1) * 128
 
+    console.log('tx', tx)
+    const buf = Buffer.from(tx, 'hex')
+    console.log(buf.buffer)
+
     // little-endian
-    const commitment = Uint8Array.from(tx.data.slice(0, 32)).reverse()
+    const commitment = new Uint8Array(buf.buffer.slice(0, 32)).reverse()
+    console.log(commitment)
     console.log('Memo commit', Helpers.numToStr(commitment))
     account.addCommitment(BigInt(txNum), commitment)
 
-    const buf = Uint8Array.from(tx.data.slice(32))
+    const memo = new Uint8Array(buf.buffer.slice(64))
 
-    console.log(buf.toString().slice(0, 100))
-    console.log(buf.length)
+    console.log(memo.toString().slice(0, 100))
+    console.log(memo.length)
 
-    const memo = decodeMemo(Buffer.from(buf), null);
-    const hashes = [memo.accHash].concat(memo.noteHashes).map(Helpers.numToStr)
+    const memoFields = decodeMemo(Buffer.from(memo), null);
+    const hashes = [memoFields.accHash].concat(memoFields.noteHashes).map(Helpers.numToStr)
 
     const numLeafs = BigInt(constants.OUT + 1)
     const accountOffset = BigInt(offset + BigInt(txNum) * numLeafs)
 
-    const pair = account.decryptPair(buf)
+    const pair = account.decryptPair(memo)
     if (pair) {
       console.log(pair.account)
       account.addAccount(accountOffset, hashes, pair.account, [])
     }
 
-    const notes = account.decryptNotes(buf)
+    const notes = account.decryptNotes(memo)
       .filter(({ note }) => note.b !== '0')
       .map(({ note, index }) => {
         return {

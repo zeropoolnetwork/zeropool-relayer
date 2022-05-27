@@ -1,16 +1,18 @@
 import BN from 'bn.js'
 import Web3 from 'web3'
-import { toWei } from 'web3-utils'
+import type { TransactionConfig} from 'web3-core'
 
 export async function signAndSend(
+  {
+    data,
+    nonce,
+    gasPrice,
+    value,
+    gas,
+    to,
+    chainId,
+  }: TransactionConfig,
   privateKey: string,
-  data: string,
-  nonce: number,
-  gasPrice: string,
-  amount: BN,
-  gasLimit: string | number,
-  to: string,
-  chainId: number,
   web3: Web3
 ): Promise<string> {
   const serializedTx = await web3.eth.accounts.signTransaction(
@@ -19,9 +21,9 @@ export async function signAndSend(
       chainId,
       to,
       data,
-      value: toWei(amount),
+      value,
       gasPrice,
-      gas: gasLimit
+      gas
     },
     privateKey
   )

@@ -1,7 +1,7 @@
 ARG VERIFIER_IMAGE
 FROM $VERIFIER_IMAGE as verifier
 
-FROM rust:1.57.0-slim-buster as base
+FROM rust:1.61.0-slim-buster as base
 
 WORKDIR /app
 

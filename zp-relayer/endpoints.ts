@@ -3,7 +3,7 @@ import childProcess from 'child_process'
 import { Request, Response, NextFunction } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
-import { txQueue } from './services/jobQueue'
+import { poolTxQueue } from './services/poolTxQueue'
 
 const {
   TX_PROOFS_DIR,
@@ -50,6 +50,7 @@ async function merkleRoot(req: Request, res: Response, next: NextFunction) {
 
 async function getTransactions(req: Request, res: Response, next: NextFunction) {
   const limit = Number(req.query.limit as string || '100')
+  const isOptimistic = req.query.optimistic === 'true'
   if (isNaN(limit) || limit <= 0) {
     next(new Error("limit must be a positive number"))
     return
@@ -61,13 +62,14 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
     return
   }
 
-  const txs = await pool.getTransactions(limit, offset)
+  const state = isOptimistic ? pool.optimisticState : pool.state
+  const txs = await state.getTransactions(limit, offset)
   res.json(txs)
 }
 
 async function getJob(req: Request, res: Response) {
   const jobId = req.params.id
-  const job = await txQueue.getJob(jobId)
+  const job = await poolTxQueue.getJob(jobId)
   if (job) {
     const state = await job.getState()
     const txHash = job.returnvalue
@@ -81,8 +83,8 @@ async function getJob(req: Request, res: Response) {
 }
 
 function relayerInfo(req: Request, res: Response) {
-  const deltaIndex = pool.tree.getNextIndex()
-  const root = pool.getLocalMerkleRoot()
+  const deltaIndex = pool.state.getNextIndex()
+  const root = pool.state.getMerkleRoot()
 
   res.json({
     root,
