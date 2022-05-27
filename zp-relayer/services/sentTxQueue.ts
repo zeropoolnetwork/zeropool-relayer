@@ -10,6 +10,7 @@ export interface SentTxPayload {
   outCommit: string
   commitIndex: number
   txHash: string
+  txData: string
   txConfig: TransactionConfig
 }
 

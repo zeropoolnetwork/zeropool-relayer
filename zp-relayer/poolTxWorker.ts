@@ -76,7 +76,7 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
     console.log('COMMIT INDEX', commitIndex)
     pool.optimisticState.addCommitment(commitIndex, Helpers.strToNum(outCommit))
 
-    logger.debug(`${logPrefix} Adding tx to storage`)
+    logger.debug(`${logPrefix} Adding tx to optimistic storage`)
     pool.optimisticState.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
 
     await sentTxQueue.add(txHash, {
@@ -84,6 +84,7 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
       outCommit,
       commitIndex,
       txHash,
+      txData,
       txConfig: {}
     },
       {

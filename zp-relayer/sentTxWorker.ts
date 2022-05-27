@@ -2,7 +2,7 @@ import { Job, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
-import { SENT_TX_QUEUE_NAME } from './utils/constants'
+import { SENT_TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
 import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { Helpers } from 'libzkbob-rs-node-tmp'
 import { pool } from './pool'
@@ -45,6 +45,7 @@ export class SentTxWorker extends RelayerWorker<SentTxPayload> {
 
     const {
       txHash,
+      txData,
       commitIndex,
       outCommit,
       payload
@@ -56,6 +57,9 @@ export class SentTxWorker extends RelayerWorker<SentTxPayload> {
         logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockNumber)
 
         pool.state.addCommitment(commitIndex, Helpers.strToNum(outCommit))
+        logger.debug(`${logPrefix} Adding tx to storage`)
+        pool.state.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
+
         const node1 = pool.state.getCommitment(commitIndex)
         const node2 = pool.optimisticState.getCommitment(commitIndex)
         logger.info(`Assert nodes are equal: ${node1}, ${node2}, ${node1 === node2}`)

@@ -193,8 +193,10 @@ class Pool {
       const commitAndMemo = numToHex(toBN(outCommit)).concat(transactionHash.slice(2)).concat(truncatedMemo)
 
       const index = Number(returnValues.index) - OUTPLUSONE
-      this.state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit))
-      this.state.addTx(index, Buffer.from(commitAndMemo, 'hex'))
+      for (let state of [this.state, this.optimisticState]) {
+        state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit))
+        state.addTx(index, Buffer.from(commitAndMemo, 'hex'))
+      }
     }
 
     logger.debug(`LOCAL ROOT AFTER UPDATE ${this.state.getMerkleRoot()}`)
