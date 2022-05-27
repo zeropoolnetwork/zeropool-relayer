@@ -27,10 +27,6 @@ export interface PermittableDepositTxData extends DefaultTxData {
 }
 
 export type TxData = DefaultTxData | WithdrawTxData | PermittableDepositTxData
-// export type A<B extends TxType> = B extends TxType.WITHDRAWAL ? WithdrawTxData : 
-//   (B extends TxType.PERMITTABLE_DEPOSIT ? PermittableDepositTxData: DefaultTxData)
-
-// let a: A<TxType.WITHDRAWAL>
 
 // Size in bytes
 const U256_SIZE = 32

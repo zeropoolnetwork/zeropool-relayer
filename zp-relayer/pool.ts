@@ -24,10 +24,11 @@ import {
   checkTxProof,
   checkTxSpecificFields,
   parseDelta,
+  checkDeadline,
 } from './validation'
 import { PoolState } from './state'
 
-import { getTxData, TxType, WithdrawTxData } from 'zp-memo-parser'
+import { getTxData, TxType, WithdrawTxData, PermittableDepositTxData } from 'zp-memo-parser'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { OUTPLUSONE } from './utils/constants'
@@ -72,17 +73,27 @@ class Pool {
 
     const buf = Buffer.from(rawMemo, 'hex')
     const txData = getTxData(buf, txType)
-    const nativeAmount = txType === TxType.WITHDRAWAL ? (txData as WithdrawTxData).nativeAmount : null
 
     await checkAssertion(
       () => checkFee(txData.fee),
       `Fee too low`
     )
 
-    await checkAssertion(
-      () => checkNativeAmount(nativeAmount),
-      `Native amount too high`
-    )
+    if (txType === TxType.WITHDRAWAL) {
+      const nativeAmount = (txData as WithdrawTxData).nativeAmount
+      await checkAssertion(
+        () => checkNativeAmount(nativeAmount),
+        `Native amount too high`
+      )
+    }
+
+    if (txType === TxType.PERMITTABLE_DEPOSIT) {
+      const deadline = (txData as PermittableDepositTxData).deadline
+      await checkAssertion(
+        () => checkDeadline(deadline),
+        `Deadline is expired`
+      )
+    }
 
     await checkAssertion(
       () => checkTxProof(txProof),

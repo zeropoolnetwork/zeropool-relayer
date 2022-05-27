@@ -9,7 +9,8 @@ export function toTxType(t: string): TxType {
   if (
     t === TxType.DEPOSIT ||
     t === TxType.TRANSFER ||
-    t === TxType.WITHDRAWAL
+    t === TxType.WITHDRAWAL ||
+    t === TxType.PERMITTABLE_DEPOSIT
   ) {
     return t
   } else {

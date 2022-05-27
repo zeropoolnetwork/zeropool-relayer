@@ -35,7 +35,7 @@ export function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
 export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, txData: TxData, msgValue: BN) {
   logger.debug('TOKENS %O, ENERGY %O, TX DATA %O, MSG VALUE %O', tokenAmount, energyAmount, txData, msgValue)
   let isValid = false
-  if (txType === TxType.DEPOSIT) {
+  if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
     isValid =
       tokenAmount.gte(ZERO) &&
       energyAmount.eq(ZERO) &&
@@ -77,6 +77,16 @@ export function checkNativeAmount(nativeAmount: BN | null) {
 export function checkFee(fee: BN) {
   logger.debug(`Fee: ${fee}`)
   return fee >= config.relayerFee
+}
+
+export function checkDeadline(deadline: BN) {
+  logger.debug(`Deadline: ${deadline}`)
+  // Check native amount (relayer faucet)
+  const currentTimestamp = new BN(Math.floor(Date.now() / 1000))
+  if (deadline <= currentTimestamp) {
+    return false
+  }
+  return true
 }
 
 export async function checkAssertion(f: Function, errStr: string) {
