@@ -1,0 +1,29 @@
+name: zkbob-relayer
+
+on: push
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Evaluate relayer tag
+        id: tag
+        uses: EndBug/version-check@v1
+        with:
+          file-name: ./zp-relayer/package.json
+      - name: Build and push
+        if: steps.tag.outputs.changed == 'true'
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          file: ./docker/Dockerfile.relayer
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/zp-relayer:${{ steps.tag.outputs.version }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/zp-relayer:latest
+          cache-from: type=gha
+          cache-to: type=gha
