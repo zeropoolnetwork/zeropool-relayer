@@ -4,15 +4,15 @@ import cors from 'cors'
 import express from 'express'
 import { logger } from './services/appLogger'
 import { createLoggerMiddleware } from './services/loggerMiddleware'
-import { PoolTxWorker } from './poolTxWorker'
-import { SentTxWorker } from './sentTxWorker'
+import { poolTxWorker } from './poolTxWorker'
+import { sentTxWorker } from './sentTxWorker'
 import endpoints from './endpoints'
 import { config } from './config/config'
 import { pool } from './pool'
 
 pool.init().then(() => {
-  new PoolTxWorker().start()
-  new SentTxWorker().start()
+  poolTxWorker.run()
+  sentTxWorker.run()
 })
 
 const {

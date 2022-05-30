@@ -3,12 +3,9 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { SENT_TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
-import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { Helpers } from 'libzkbob-rs-node'
 import { pool } from './pool'
 import { SentTxPayload } from './services/sentTxQueue'
-import { RelayerWorker } from './relayerWorker'
-import { redis } from './services/redisClient'
 
 const token = 'RELAYER'
 const MAX_SENT_LIMIT = 10
@@ -23,58 +20,41 @@ async function collectBatch<T>(worker: Worker<T>, maxSize: number) {
   return jobs
 }
 
-export class SentTxWorker extends RelayerWorker<SentTxPayload> {
-  constructor() {
-    const sentTxQueueWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, undefined, {
-      connection: redis
-    })
-    super('sent-tx', 500, sentTxQueueWorker)
-  }
+export const sentTxWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, async job => {
+  const logPrefix = `SENT WORKER: Job ${job.id}:`
+  logger.info('%s processing...', logPrefix)
 
-  async init() {
-    await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
-  }
+  const {
+    txHash,
+    txData,
+    commitIndex,
+    outCommit,
+    payload
+  } = job.data
 
-  async checkPreconditions(): Promise<boolean> {
-    return true
-  }
+  const tx = await web3.eth.getTransactionReceipt(txHash)
+  if (tx) { // Tx mined
+    if (tx.status) { // Successful
+      logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockNumber)
 
-  async run(job: Job<SentTxPayload>) {
-    const logPrefix = `SENT WORKER: Job ${job.id}:`
-    logger.info('%s processing...', logPrefix)
+      pool.state.addCommitment(commitIndex, Helpers.strToNum(outCommit))
+      logger.debug(`${logPrefix} Adding tx to storage`)
+      pool.state.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
 
-    const {
-      txHash,
-      txData,
-      commitIndex,
-      outCommit,
-      payload
-    } = job.data
+      const node1 = pool.state.getCommitment(commitIndex)
+      const node2 = pool.optimisticState.getCommitment(commitIndex)
+      logger.info(`Assert nodes are equal: ${node1}, ${node2}, ${node1 === node2}`)
 
-    const tx = await web3.eth.getTransactionReceipt(txHash)
-    if (tx) { // Tx mined
-      if (tx.status) { // Successful
-        logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockNumber)
-
-        pool.state.addCommitment(commitIndex, Helpers.strToNum(outCommit))
-        logger.debug(`${logPrefix} Adding tx to storage`)
-        pool.state.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
-
-        const node1 = pool.state.getCommitment(commitIndex)
-        const node2 = pool.optimisticState.getCommitment(commitIndex)
-        logger.info(`Assert nodes are equal: ${node1}, ${node2}, ${node1 === node2}`)
-
-        return txHash
-      } else { // Revert
-        logger.debug('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
-        const failTxs = await collectBatch(this.internalWorker, MAX_SENT_LIMIT + 1)
-        for (const failTxJob of failTxs) {
-          const newJob = await poolTxQueue.add('tx', failTxJob.data.payload)
-          logger.debug('%s Moved job %s to main queue: %s', logPrefix, failTxJob.id, newJob.id)
-        }
+      return txHash
+    } else { // Revert
+      logger.debug('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
+      const failTxs = await collectBatch(sentTxWorker, MAX_SENT_LIMIT + 1)
+      for (const failTxJob of failTxs) {
+        const newJob = await poolTxQueue.add('tx', failTxJob.data.payload)
+        logger.debug('%s Moved job %s to main queue: %s', logPrefix, failTxJob.id, newJob.id)
       }
-    } else { // Not mined
-      logger.error('Unsupported')
     }
+  } else { // Not mined
+    logger.error('Unsupported')
   }
-}
+}, { autorun: false })
