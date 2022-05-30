@@ -6,7 +6,7 @@ import { logger } from './services/appLogger'
 import { TxPayload } from './services/poolTxQueue'
 import { TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE, } from './utils/constants'
 import { numToHex, flattenProof, truncateHexPrefix } from './utils/helpers'
-import { SnarkProof, Proof } from 'libzkbob-rs-node-tmp'
+import { SnarkProof, Proof } from 'libzkbob-rs-node'
 import { TxType } from 'zp-memo-parser'
 import type { Pool } from './pool'
 

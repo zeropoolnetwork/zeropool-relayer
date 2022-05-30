@@ -7,7 +7,7 @@ import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT, TX_CHECK_DELAY } from './uti
 import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
-import { Helpers } from 'libzkbob-rs-node-tmp'
+import { Helpers } from 'libzkbob-rs-node'
 import { pool } from './pool'
 import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'

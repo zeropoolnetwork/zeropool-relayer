@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import { toBN } from 'web3-utils'
 import { TxType, TxData, WithdrawTxData } from 'zp-memo-parser'
-import { Helpers, Proof } from 'libzkbob-rs-node-tmp'
+import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
 import { config } from './config/config'
 import { pool } from './pool'

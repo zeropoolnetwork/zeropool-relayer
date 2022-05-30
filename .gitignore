@@ -4,11 +4,10 @@ node_modules
 dist
 build
 
-tree.db
-txs.db
-
+# Relayer files
+**/*.db
+**/tx_proofs/
 prover.js
-
 *params.bin
 *_key.json
 
@@ -16,3 +15,4 @@ prover.js
 
 # Log file
 zp.log
+yarn-error.log

@@ -1,7 +1,7 @@
 import {
   Params,
   Proof,
-} from 'libzkbob-rs-node-tmp'
+} from 'libzkbob-rs-node'
 
 const txParams = Params.fromFile('./params/transfer_params.bin')
 
