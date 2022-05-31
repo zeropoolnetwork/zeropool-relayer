@@ -2,8 +2,7 @@ import { Job, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
-import { SENT_TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
-import { Helpers } from 'libzkbob-rs-node'
+import { SENT_TX_QUEUE_NAME } from './utils/constants'
 import { pool } from './pool'
 import { SentTxPayload } from './services/sentTxQueue'
 
@@ -37,9 +36,7 @@ export const sentTxWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, async 
     if (tx.status) { // Successful
       logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockNumber)
 
-      pool.state.addCommitment(commitIndex, Helpers.strToNum(outCommit))
-      logger.debug(`${logPrefix} Adding tx to storage`)
-      pool.state.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
+      pool.state.updateState(commitIndex, outCommit, txData)
 
       const node1 = pool.state.getCommitment(commitIndex)
       const node2 = pool.optimisticState.getCommitment(commitIndex)

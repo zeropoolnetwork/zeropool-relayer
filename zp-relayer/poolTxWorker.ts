@@ -7,7 +7,6 @@ import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT, TX_CHECK_DELAY } from './uti
 import { readNonce, updateField, RelayerKeys } from './utils/redisFields'
 import { numToHex, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
-import { Helpers } from 'libzkbob-rs-node'
 import { pool } from './pool'
 import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
@@ -51,12 +50,7 @@ export const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
     .concat(txHash.slice(2))
     .concat(truncatedMemo)
 
-  logger.debug(`${logPrefix} Updating optimistic tree`)
-  console.log('COMMIT INDEX', commitIndex)
-  pool.optimisticState.addCommitment(commitIndex, Helpers.strToNum(outCommit))
-
-  logger.debug(`${logPrefix} Adding tx to optimistic storage`)
-  pool.optimisticState.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
+  pool.optimisticState.updateState(commitIndex, outCommit, txData)
 
   await sentTxQueue.add(txHash, {
     payload: job.data,
