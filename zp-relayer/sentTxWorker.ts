@@ -5,6 +5,7 @@ import { poolTxQueue } from './services/poolTxQueue'
 import { SENT_TX_QUEUE_NAME } from './utils/constants'
 import { pool } from './pool'
 import { SentTxPayload } from './services/sentTxQueue'
+import { redis } from './services/redisClient'
 
 const token = 'RELAYER'
 const MAX_SENT_LIMIT = 10
@@ -54,4 +55,7 @@ export const sentTxWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, async 
   } else { // Not mined
     logger.error('Unsupported')
   }
-}, { autorun: false })
+}, {
+  autorun: false,
+  connection: redis
+})

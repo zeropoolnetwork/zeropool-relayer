@@ -4,7 +4,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { TxPayload } from './services/poolTxQueue'
 import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT, TX_CHECK_DELAY } from './utils/constants'
-import { readNonce, updateField, RelayerKeys } from './utils/redisFields'
+import { readNonce, updateField, RelayerKeys, incrNonce } from './utils/redisFields'
 import { numToHex, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
 import { pool } from './pool'
@@ -12,6 +12,7 @@ import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
 import { toWei } from 'web3-utils'
 import { config } from './config/config'
+import { redis } from './services/redisClient'
 
 const {
   RELAYER_ADDRESS_PRIVATE_KEY,
@@ -26,7 +27,7 @@ export const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
   const { gas, amount, rawMemo, txType, txProof } = job.data
   const outCommit = txProof.inputs[2]
 
-  const nonce = Number(await readNonce())
+  const nonce = await incrNonce()
   const txHash = await signAndSend(
     {
       data,
@@ -42,7 +43,6 @@ export const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
   )
   logger.debug(`${logPrefix} TX hash ${txHash}`)
 
-  await updateField(RelayerKeys.NONCE, nonce + 1)
   await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
 
   const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
@@ -70,4 +70,8 @@ export const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
   }
 
   return txHash
-}, { autorun: false });
+}, {
+  autorun: false,
+  connection: redis,
+  concurrency: 1,
+});
