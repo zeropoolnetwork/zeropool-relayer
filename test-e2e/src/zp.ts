@@ -4,7 +4,7 @@ import { toBN } from 'web3-utils'
 import { decodeMemo } from 'zp-memo-parser'
 import TokenAbi from './token-abi.json'
 import { postData, numToHex, fakeTxProof, packSignature } from './utils'
-import { rpcUrl, relayerUrlFirst, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
+import { rpcUrl, relayerUrl, tokenAddress, zpAddress, energyAddress } from './constants.json'
 import { UserAccount, UserState, getConstants, Helpers, IWithdrawData, IDepositData, ITransferData, Proof, Params } from 'libzeropool-rs-wasm-bundler'
 
 export const web3 = new Web3(rpcUrl)
@@ -29,17 +29,31 @@ export async function getBalanceDiff(address: string, f: Function) {
   return balanceAfter.sub(balanceBefore)
 }
 
-export async function syncAccounts(accounts: UserAccount[], relayerUrl = relayerUrlFirst) {
+export async function syncAccounts(accounts: UserAccount[], optimistic = true) {
   for (const account of accounts) {
     console.log('syncing')
-    await syncNotesAndAccount(account, relayerUrl)
+    await syncNotesAndAccount(account, { optimistic })
   }
 }
 
-export async function syncNotesAndAccount(account: UserAccount, relayerUrl = relayerUrlFirst, numTxs = 20n, offset = 0n) {
-  const txs = await fetch(
-    `${relayerUrl}/transactions?limit=${numTxs.toString()}&offset=${offset.toString()}&optimistic=true`
-  ).then(r => r.json())
+interface SyncAccountsOptions {
+  limit?: bigint
+  offset?: bigint
+  optimistic: boolean
+}
+
+export async function syncNotesAndAccount(
+  account: UserAccount,
+  {
+    limit = 20n,
+    offset = 0n,
+    optimistic = true
+  }: SyncAccountsOptions
+) {
+  let url = `${relayerUrl}/transactions?limit=${limit.toString()}&offset=${offset.toString()}`
+  if (optimistic) url += '&optimistic=true'
+
+  const txs = await fetch(url).then(r => r.json())
 
   console.log(`Received ${txs.length} transactions`)
 
@@ -51,20 +65,13 @@ export async function syncNotesAndAccount(account: UserAccount, relayerUrl = rel
     // @ts-ignore
     accountToDelta[account] = (txNum + 1) * 128
 
-    console.log('tx', tx)
     const buf = Buffer.from(tx, 'hex')
-    console.log(buf.buffer)
 
     // little-endian
     const commitment = new Uint8Array(buf.buffer.slice(0, 32)).reverse()
-    console.log(commitment)
-    console.log('Memo commit', Helpers.numToStr(commitment))
     account.addCommitment(BigInt(txNum), commitment)
 
     const memo = new Uint8Array(buf.buffer.slice(64))
-
-    console.log(memo.toString().slice(0, 100))
-    console.log(memo.length)
 
     const memoFields = decodeMemo(Buffer.from(memo), null);
     const hashes = [memoFields.accHash].concat(memoFields.noteHashes).map(Helpers.numToStr)
@@ -74,7 +81,6 @@ export async function syncNotesAndAccount(account: UserAccount, relayerUrl = rel
 
     const pair = account.decryptPair(memo)
     if (pair) {
-      console.log(pair.account)
       account.addAccount(accountOffset, hashes, pair.account, [])
     }
 
@@ -87,106 +93,99 @@ export async function syncNotesAndAccount(account: UserAccount, relayerUrl = rel
         }
       })
     if (notes.length > 0) {
-      console.log(notes)
       account.addNotes(accountOffset, hashes, notes)
     }
   }
 }
 
-async function proofAndSend(mergeTx: any, fake: boolean, txType: string, depositSignature: string | null, relayerUrl: string) {
-  let data
+interface SendTx {
+  proof: any
+  memo: string
+  txType: string
+  depositSignature: string | null,
+}
+
+async function proofTx(mergeTx: any, fake: boolean) {
+  let proof
   if (fake) {
-    data = {
-      proof: {
-        inputs: [
-          mergeTx.public.root,
-          mergeTx.public.nullifier,
-          mergeTx.public.out_commit,
-          mergeTx.public.delta,
-          mergeTx.public.memo,
-        ],
-        ...fakeTxProof
-      },
+    proof = {
+      inputs: [
+        mergeTx.public.root,
+        mergeTx.public.nullifier,
+        mergeTx.public.out_commit,
+        mergeTx.public.delta,
+        mergeTx.public.memo,
+      ],
+      ...fakeTxProof
     }
   } else {
     console.log('Getting proof from relayer...')
-    const proof = await postData(`${relayerUrl}/proof_tx`, { pub: mergeTx.public, sec: mergeTx.secret })
+    proof = await postData(`${relayerUrl}/proof_tx`, { pub: mergeTx.public, sec: mergeTx.secret })
       .then(r => r.json())
-    console.log('Got tx proof', proof)
-
-    data = {
-      proof,
-    }
+    console.log('Received tx proof')
   }
 
-  data = {
-    ...data,
-    memo: mergeTx.memo,
-    txType,
-    depositSignature,
-  }
+  return proof
+}
 
-  await postData(`${relayerUrl}/transaction`, data)
+export async function sendTx(sendTxData: SendTx) {
+  return await postData(`${relayerUrl}/transaction`, sendTxData)
     .then(data => {
       console.log(data)
     })
 }
 
-export async function createAccount(sk: number[], stateId: string) {
+export async function createAccount(id: number) {
+  const sk = [id]
+  const stateId = id.toString()
   const state = await UserState.init(stateId)
-  const account = new UserAccount(Uint8Array.from(sk), state)
-  return account
+  const zkAccount = new UserAccount(Uint8Array.from(sk), state)
+  return zkAccount
 }
 
-async function signAndSend(to: string, data: string) {
-  const serializedTx = await web3.eth.accounts.signTransaction(
-    {
-      to,
-      data,
-      gas: '1000000'
-    },
-    clientPK
-  )
-
-  return new Promise((res, rej) =>
-    web3.eth
-      .sendSignedTransaction(serializedTx.rawTransaction as string)
-      .once('transactionHash', res)
-      .once('error', rej)
-  )
-}
-
-export async function deposit(account: UserAccount, from: string, amount: string, relayerUrl = relayerUrlFirst, fake = false) {
-  const amounBN = toBN(amount)
+export async function approve(amount: string, from: string) {
   console.log('Approving tokens...')
-  const data = token.methods.approve(zpAddress, amounBN.mul(denominator)).encodeABI()
-  await signAndSend(tokenAddress, data)
+  await token.methods.approve(zpAddress, toBN(amount).mul(denominator)).send({ from })
+}
+
+export async function deposit(account: UserAccount, amount: string, pk: string, fake = false): Promise<SendTx> {
   console.log('Making a deposit...')
   const deposit: IDepositData = {
     fee: '0',
     amount,
   }
   const mergeTx = await account.createDeposit(deposit)
-  const depositSignature = web3.eth.accounts.sign(
+  const depositSignature = packSignature(web3.eth.accounts.sign(
     numToHex(web3, mergeTx.public.nullifier),
-    clientPK
-  )
-  await proofAndSend(mergeTx, fake, '0000', packSignature(depositSignature), relayerUrl)
-  return mergeTx
+    pk
+  ))
+  const proof = await proofTx(mergeTx, fake)
+  return {
+    proof,
+    memo: mergeTx.memo,
+    depositSignature,
+    txType: '0000'
+  }
 }
 
-export async function transfer(account: UserAccount, to: string, amount: string, relayerUrl = relayerUrlFirst, fake = false) {
+export async function transfer(account: UserAccount, to: string, amount: string, fake = false): Promise<SendTx> {
   console.log('Making a transfer...')
   const transfer: ITransferData = {
     fee: '0',
     outputs: [{ to, amount }]
   }
   const mergeTx = await account.createTransfer(transfer)
-  await proofAndSend(mergeTx, fake, '0001', null, relayerUrl)
-  return mergeTx
+
+  const proof = await proofTx(mergeTx, fake)
+  return {
+    proof,
+    memo: mergeTx.memo,
+    depositSignature: null,
+    txType: '0001'
+  }
 }
 
-export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, relayerUrl = relayerUrlFirst, fake = false) {
+export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, fake = false): Promise<SendTx> {
   console.log('Making a withdraw...')
   const withdraw: IWithdrawData = {
     fee: '0',
@@ -196,6 +195,11 @@ export async function withdraw(account: UserAccount, to: Uint8Array, amount: str
     energy_amount,
   }
   const mergeTx = await account.createWithdraw(withdraw)
-  await proofAndSend(mergeTx, fake, '0002', null, relayerUrl)
-  return mergeTx
+  const proof = await proofTx(mergeTx, fake)
+  return {
+    proof,
+    memo: mergeTx.memo,
+    depositSignature: null,
+    txType: '0002'
+  }
 }

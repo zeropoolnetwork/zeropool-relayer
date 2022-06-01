@@ -5,13 +5,16 @@ import {
   TxStorage,
   MerkleProof,
   Constants,
+  Helpers,
 } from 'libzkbob-rs-node'
 
 export class PoolState {
+  private name: string
   private tree: MerkleTree
   private txs: TxStorage
 
   constructor(name: string) {
+    this.name = name
     this.tree = new MerkleTree(`./${name}Tree.db`)
     this.txs = new TxStorage(`./${name}Txs.db`)
   }
@@ -99,6 +102,14 @@ export class PoolState {
 
   deleteTx(i: number) {
     this.txs.delete(i)
+  }
+
+  updateState(commitIndex: number, outCommit: string, txData: string) {
+    logger.debug(`Updating ${this.name} state tree`)
+    this.addCommitment(commitIndex, Helpers.strToNum(outCommit))
+
+    logger.debug(`Adding tx to ${this.name} state storage`)
+    this.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
   }
 
   async getTransactions(limit: number, offset: number) {

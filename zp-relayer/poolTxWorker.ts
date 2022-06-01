@@ -1,19 +1,17 @@
 import { toBN } from 'web3-utils'
-import { Job, Worker } from 'bullmq'
+import { Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { TxPayload } from './services/poolTxQueue'
 import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT, TX_CHECK_DELAY } from './utils/constants'
-import { readNonce, readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
+import { readNonce, updateField, RelayerKeys, incrNonce } from './utils/redisFields'
 import { numToHex, truncateMemoTxPrefix } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
-import { Helpers } from 'libzkbob-rs-node'
 import { pool } from './pool'
 import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
 import { toWei } from 'web3-utils'
 import { config } from './config/config'
-import { RelayerWorker } from './relayerWorker'
 import { redis } from './services/redisClient'
 
 const {
@@ -21,26 +19,9 @@ const {
   GAS_PRICE,
 } = process.env as Record<PropertyKey, string>
 
-export class PoolTxWorker extends RelayerWorker<TxPayload> {
-  constructor() {
-    const poolTxQueueWorker = new Worker<TxPayload>(TX_QUEUE_NAME, undefined, {
-      connection: redis
-    })
-    super('pool-tx', 500, poolTxQueueWorker)
-  }
-
-  async init() {
-    await updateField(RelayerKeys.NONCE, await readNonce(true))
-    await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
-  }
-
-  async checkPreconditions() {
-    const sentTxNum = await sentTxQueue.count()
-    if (sentTxNum > MAX_SENT_LIMIT) return false
-    return true
-  }
-
-  async run(job: Job<TxPayload>) {
+export async function createPoolTxWorker() {
+  await updateField(RelayerKeys.NONCE, await readNonce(true))
+  const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
     const logPrefix = `POOL WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
 
@@ -48,7 +29,8 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
     const { gas, amount, rawMemo, txType, txProof } = job.data
     const outCommit = txProof.inputs[2]
 
-    const nonce = Number(await readNonce())
+    const nonce = await incrNonce()
+    logger.info(`${logPrefix} nonce: ${nonce}`)
     const txHash = await signAndSend(
       {
         data,
@@ -64,7 +46,6 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
     )
     logger.debug(`${logPrefix} TX hash ${txHash}`)
 
-    await updateField(RelayerKeys.NONCE, nonce + 1)
     await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
 
     const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
@@ -72,12 +53,7 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
       .concat(txHash.slice(2))
       .concat(truncatedMemo)
 
-    logger.debug(`${logPrefix} Updating optimistic tree`)
-    console.log('COMMIT INDEX', commitIndex)
-    pool.optimisticState.addCommitment(commitIndex, Helpers.strToNum(outCommit))
-
-    logger.debug(`${logPrefix} Adding tx to optimistic storage`)
-    pool.optimisticState.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
+    pool.optimisticState.updateState(commitIndex, outCommit, txData)
 
     await sentTxQueue.add(txHash, {
       payload: job.data,
@@ -91,6 +67,17 @@ export class PoolTxWorker extends RelayerWorker<TxPayload> {
         delay: TX_CHECK_DELAY
       })
 
+    const sentTxNum = await sentTxQueue.count()
+    if (sentTxNum > MAX_SENT_LIMIT) {
+      await poolTxWorker.pause()
+    }
+
     return txHash
-  }
+  }, {
+    autorun: false,
+    connection: redis,
+    concurrency: 1,
+  })
+
+  return poolTxWorker
 }

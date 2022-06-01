@@ -2,12 +2,9 @@ import { Job, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
-import { SENT_TX_QUEUE_NAME, OUTPLUSONE } from './utils/constants'
-import { readTransferNum, updateField, RelayerKeys } from './utils/redisFields'
-import { Helpers } from 'libzkbob-rs-node'
+import { SENT_TX_QUEUE_NAME } from './utils/constants'
 import { pool } from './pool'
 import { SentTxPayload } from './services/sentTxQueue'
-import { RelayerWorker } from './relayerWorker'
 import { redis } from './services/redisClient'
 
 const token = 'RELAYER'
@@ -23,23 +20,8 @@ async function collectBatch<T>(worker: Worker<T>, maxSize: number) {
   return jobs
 }
 
-export class SentTxWorker extends RelayerWorker<SentTxPayload> {
-  constructor() {
-    const sentTxQueueWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, undefined, {
-      connection: redis
-    })
-    super('sent-tx', 500, sentTxQueueWorker)
-  }
-
-  async init() {
-    await updateField(RelayerKeys.TRANSFER_NUM, await readTransferNum(true))
-  }
-
-  async checkPreconditions(): Promise<boolean> {
-    return true
-  }
-
-  async run(job: Job<SentTxPayload>) {
+export async function createSentTxWorker() {
+  const sentTxWorker = new Worker<SentTxPayload>(SENT_TX_QUEUE_NAME, async job => {
     const logPrefix = `SENT WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
 
@@ -56,9 +38,7 @@ export class SentTxWorker extends RelayerWorker<SentTxPayload> {
       if (tx.status) { // Successful
         logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockNumber)
 
-        pool.state.addCommitment(commitIndex, Helpers.strToNum(outCommit))
-        logger.debug(`${logPrefix} Adding tx to storage`)
-        pool.state.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
+        pool.state.updateState(commitIndex, outCommit, txData)
 
         const node1 = pool.state.getCommitment(commitIndex)
         const node2 = pool.optimisticState.getCommitment(commitIndex)
@@ -67,7 +47,7 @@ export class SentTxWorker extends RelayerWorker<SentTxPayload> {
         return txHash
       } else { // Revert
         logger.debug('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
-        const failTxs = await collectBatch(this.internalWorker, MAX_SENT_LIMIT + 1)
+        const failTxs = await collectBatch(sentTxWorker, MAX_SENT_LIMIT + 1)
         for (const failTxJob of failTxs) {
           const newJob = await poolTxQueue.add('tx', failTxJob.data.payload)
           logger.debug('%s Moved job %s to main queue: %s', logPrefix, failTxJob.id, newJob.id)
@@ -76,5 +56,9 @@ export class SentTxWorker extends RelayerWorker<SentTxPayload> {
     } else { // Not mined
       logger.error('Unsupported')
     }
-  }
+  }, {
+    autorun: false,
+    connection: redis
+  })
+  return sentTxWorker
 }

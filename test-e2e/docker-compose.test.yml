@@ -15,31 +15,17 @@ services:
     image: lok52/zp-contracts:latest
     depends_on:
       - ganache
-  redis1:
-    container_name: redis1
+  redis:
+    container_name: redis
     command: [redis-server, --port, '6379', --appendonly, 'yes']
     image: redis:6.2.6
     ports:
       - 6379:6379
-  redis2:
-    container_name: redis2
-    command: [redis-server, --port, '6380', --appendonly, 'yes']
-    image: redis:6.2.6
-    ports:
-      - 6380:6380
-  relayer1:
+  relayer:
     image: lok52/zp-relayer:latest
-    container_name: relayer1
+    container_name: relayer
     volumes:
       - $PARAMS_PATH:/app/zp-relayer/params/
     ports:
       - 8000:8000
-    env_file: ./relayer1.env
-  relayer2:
-    image: lok52/zp-relayer:latest
-    container_name: relayer2
-    volumes:
-      - $PARAMS_PATH:/app/zp-relayer/params/
-    ports:
-      - 8001:8001
-    env_file: ./relayer2.env
+    env_file: ./relayer.env

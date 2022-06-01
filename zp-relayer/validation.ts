@@ -33,7 +33,12 @@ export function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
 }
 
 export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, txData: TxData, msgValue: BN) {
-  logger.debug('TOKENS %O, ENERGY %O, TX DATA %O, MSG VALUE %O', tokenAmount, energyAmount, txData, msgValue)
+  logger.debug('TOKENS %s, ENERGY %s, TX DATA %s, MSG VALUE %s',
+    tokenAmount.toString(),
+    energyAmount.toString(),
+    JSON.stringify(txData),
+    msgValue.toString()
+  )
   let isValid = false
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
     isValid =
