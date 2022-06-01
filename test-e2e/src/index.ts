@@ -7,7 +7,6 @@ import {
   deposit,
   transfer,
   withdraw,
-  getBalanceDiff,
   denominator,
   syncAccounts,
   token,
@@ -15,16 +14,14 @@ import {
   getTokenBalance,
   sendTx,
   approve,
-  web3,
 } from './zp'
-import { rpcUrl, tokenAddress, zpAddress, clientPK, energyAddress, user1, user2, user3, user4 } from './constants.json'
+import { user1, user2, user3, user4 } from './constants.json'
 
 chai.use(CBN(BN))
 const expect = chai.expect
 
 describe('ZP client', () => {
   describe('Simple user flow', () => {
-    let mergeTx
     let sendTxData
     let stateId = 0
 
@@ -124,9 +121,6 @@ describe('ZP client', () => {
       await approve('5', user3.address)
       await approve('4', user4.address)
 
-      console.log(await token.methods.allowance(user1.address, zpAddress).call())
-      console.log(await token.methods.allowance(user2.address, zpAddress).call())
-
       // Deposit
       const sendTxData1 = await deposit(account1, '5', user3.privateKey)
       const sendTxData2 = await deposit(account2, '4', user4.privateKey)
@@ -135,7 +129,7 @@ describe('ZP client', () => {
       
       await sleep(35000)
 
-      await syncAccounts([account1, account2], false)
+      await syncAccounts([account1, account2])
 
       expect(account1.totalBalance()).eq('5')
       expect(account2.totalBalance()).eq('4')

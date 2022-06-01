@@ -28,6 +28,7 @@ export const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
   const outCommit = txProof.inputs[2]
 
   const nonce = await incrNonce()
+  logger.info(`${logPrefix} nonce: ${nonce}`)
   const txHash = await signAndSend(
     {
       data,

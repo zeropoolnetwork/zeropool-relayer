@@ -4,7 +4,7 @@ import { toBN } from 'web3-utils'
 import { decodeMemo } from 'zp-memo-parser'
 import TokenAbi from './token-abi.json'
 import { postData, numToHex, fakeTxProof, packSignature } from './utils'
-import { rpcUrl, relayerUrl, tokenAddress, zpAddress, clientPK, energyAddress } from './constants.json'
+import { rpcUrl, relayerUrl, tokenAddress, zpAddress, energyAddress } from './constants.json'
 import { UserAccount, UserState, getConstants, Helpers, IWithdrawData, IDepositData, ITransferData, Proof, Params } from 'libzeropool-rs-wasm-bundler'
 
 export const web3 = new Web3(rpcUrl)
@@ -122,7 +122,7 @@ async function proofTx(mergeTx: any, fake: boolean) {
     console.log('Getting proof from relayer...')
     proof = await postData(`${relayerUrl}/proof_tx`, { pub: mergeTx.public, sec: mergeTx.secret })
       .then(r => r.json())
-    console.log('Got tx proof', proof)
+    console.log('Received tx proof')
   }
 
   return proof
@@ -148,7 +148,7 @@ export async function approve(amount: string, from: string) {
   await token.methods.approve(zpAddress, toBN(amount).mul(denominator)).send({ from })
 }
 
-export async function deposit(account: UserAccount, amount: string, pk = clientPK, fake = false): Promise<SendTx> {
+export async function deposit(account: UserAccount, amount: string, pk: string, fake = false): Promise<SendTx> {
   console.log('Making a deposit...')
   const deposit: IDepositData = {
     fee: '0',
