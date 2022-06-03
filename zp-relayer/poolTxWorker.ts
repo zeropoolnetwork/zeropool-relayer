@@ -31,19 +31,27 @@ export async function createPoolTxWorker() {
 
     const nonce = await incrNonce()
     logger.info(`${logPrefix} nonce: ${nonce}`)
-    const txHash = await signAndSend(
-      {
-        data,
-        nonce,
-        gasPrice: GAS_PRICE,
-        value: toWei(toBN(amount)),
-        gas,
-        to: config.poolAddress,
-        chainId: pool.chainId,
-      },
-      RELAYER_ADDRESS_PRIVATE_KEY,
-      web3
-    )
+    
+    let txHash: string
+    try {
+      txHash = await signAndSend(
+        {
+          data,
+          nonce,
+          gasPrice: GAS_PRICE,
+          value: toWei(toBN(amount)),
+          gas,
+          to: config.poolAddress,
+          chainId: pool.chainId,
+        },
+        RELAYER_ADDRESS_PRIVATE_KEY,
+        web3
+      )
+    } catch (e) {
+      logger.error(`${logPrefix} Send TX failed: ${e}`)
+      throw e
+    }
+
     logger.debug(`${logPrefix} TX hash ${txHash}`)
 
     await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
