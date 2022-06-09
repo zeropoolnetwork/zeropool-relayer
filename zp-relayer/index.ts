@@ -35,6 +35,7 @@ router.post('/proof_tx', endpoints.txProof)
 
 router.post('/transaction', endpoints.transaction)
 router.get('/transactions', endpoints.getTransactions)
+router.get('/transactions/v2', endpoints.getTransactionsV2)
 router.get('/merkle/root/:index?', endpoints.merkleRoot)
 router.get('/job/:id', endpoints.getJob)
 router.get('/info', endpoints.relayerInfo)
