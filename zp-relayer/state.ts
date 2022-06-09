@@ -112,17 +112,18 @@ export class PoolState {
     this.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
   }
 
-  async getTransactions(limit: number, offset: number) {
+  async getTransactions(limit: number, offset: number): Promise<{ txs: string[], nextOffset: number }> {
     const txs: string[] = []
-    offset = Math.floor(offset / OUTPLUSONE) * OUTPLUSONE
+    let nextOffset = Math.floor(offset / OUTPLUSONE) * OUTPLUSONE
     for (let i = 0; i < limit; i++) {
-      const tx = this.txs.get(offset + i * OUTPLUSONE)
+      nextOffset = offset + i * OUTPLUSONE
+      const tx = this.txs.get(nextOffset)
       if (tx) {
         txs[i] = tx.toString('hex')
       } else {
         break;
       }
     }
-    return txs
+    return { txs, nextOffset }
   }
 }

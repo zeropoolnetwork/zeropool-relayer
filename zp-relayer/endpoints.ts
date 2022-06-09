@@ -55,7 +55,7 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
     next(new Error("limit must be a positive number"))
     return
   }
-  
+
   const offset = Number(req.query.offset as string || '0')
   if (isNaN(offset) || offset < 0) {
     next(new Error("offset must be a positive number or zero"))
@@ -63,7 +63,39 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
   }
 
   const state = isOptimistic ? pool.optimisticState : pool.state
-  const txs = await state.getTransactions(limit, offset)
+  const { txs } = await state.getTransactions(limit, offset)
+  res.json(txs)
+}
+
+async function getTransactionsV2(req: Request, res: Response, next: NextFunction) {
+  const limit = Number(req.query.limit as string || '100')
+  if (isNaN(limit) || limit <= 0) {
+    next(new Error("limit must be a positive number"))
+    return
+  }
+
+  const offset = Number(req.query.offset as string || '0')
+  if (isNaN(offset) || offset < 0) {
+    next(new Error("offset must be a positive number or zero"))
+    return
+  }
+
+  const toV2Format = (prefix: string) => (tx: string) => {
+    const outCommit = tx.slice(0, 64)
+    const txHash = tx.slice(64, 128)
+    const memo = tx.slice(128)
+    return prefix + txHash + outCommit + memo
+  }
+
+  const txs: string[] = []
+  const { txs: poolTxs, nextOffset } = await pool.state.getTransactions(limit, offset)
+  txs.push(...poolTxs.map(toV2Format('1')))
+
+  if (txs.length < limit) {
+    const { txs: optimisticTxs } = await pool.optimisticState.getTransactions(limit - txs.length, nextOffset)
+    txs.push(...optimisticTxs.map(toV2Format('0')))
+  }
+
   res.json(txs)
 }
 
@@ -97,6 +129,7 @@ export default {
   transaction,
   merkleRoot,
   getTransactions,
+  getTransactionsV2,
   getJob,
   relayerInfo,
 }
