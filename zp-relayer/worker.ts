@@ -163,8 +163,6 @@ async function processTx(job: Job<TxPayload>) {
 
   const logPrefix = `Job ${jobId}:`
 
-  await pool.syncState()
-
   logger.info(`${logPrefix} Recieved ${txType} tx with ${amount} native amount`)
 
   await checkAssertion(
@@ -266,7 +264,7 @@ Transaction:
 
 
 export async function createTxWorker() {
-  initPolkadot()
+  await initPolkadot()
   await pool.init()
 
   const worker = new Worker<TxPayload>(

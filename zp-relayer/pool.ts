@@ -140,7 +140,7 @@ class Pool {
 
     const outCommit = hexToNumberString(event.outCommit)
     const truncatedMemo = truncateHexPrefix(event.data)
-    const commitAndMemo = numToHex(toBN(outCommit)).concat(truncatedMemo)
+    const commitAndMemo = numToHex(toBN(outCommit)).concat(event.allMessagesHash.slice(2)).concat(truncatedMemo)
 
     const commitIndex = this.txs.count()
     logger.info(`Adding commitment at ${commitIndex}`)

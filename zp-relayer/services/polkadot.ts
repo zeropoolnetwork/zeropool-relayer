@@ -12,15 +12,8 @@ const {
 // TODO: Remove globals
 // Construct
 const wsProvider = new WsProvider(RPC_URL)
-export const api = new ApiPromise({
+export let api = new ApiPromise({
   provider: wsProvider,
-  types: {
-    ZeropoolEvent: {
-      _enum: {
-        Message: '(u32, u32, Vec<u8>)',
-      }
-    }
-  }
 })
 // FIXME: Find a better way to initialize the library
 export let keyring: Keyring

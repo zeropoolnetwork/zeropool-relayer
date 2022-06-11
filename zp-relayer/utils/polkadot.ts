@@ -40,8 +40,13 @@ export async function getEvents(): Promise<MessageEvent[]> {
           pastEvents.push(event)
         }
       });
+
+      if (i % 100 == 0) {
+        logger.info(`Scanned block ${i}`)
+      }
     }
 
+    logger.info('Finished scanning blocks')
     logger.debug(`${pastEvents.length} Past events obtained`)
     await updateField(RelayerKeys.LATEST_CHECKED_BLOCK, lastBlock)
 
@@ -54,14 +59,14 @@ export async function getEvents(): Promise<MessageEvent[]> {
 
 export async function subscibeToEvents(handler: (event: MessageEvent) => Promise<void>) {
   api.query.system.events((events) => {
-    logger.debug(`Received ${events.length} events:`);
+    logger.debug(`Received ${events.length} events:`)
 
-    events.forEach((record) => {
+    events.forEach(async (record) => {
       const { event: ev } = record;
       if (ev.section == 'zeropool' && ev.method == 'Message') {
         const event = transformEvent(ev)
         logger.info(`New Message event at ${event.poolIndex}`);
-        handler(event)
+        await handler(event)
       }
     });
   });
