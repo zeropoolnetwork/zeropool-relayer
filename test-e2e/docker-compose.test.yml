@@ -1,6 +1,14 @@
 version: '3.8'
 
 services:
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:nightly-123ad0a427dc938a0a911eae3332de6576370a51
+    ports:
+      - 8545:8545
+    entrypoint: >
+      anvil
+      --host 0.0.0.0
+      -m "myth like bonus scare over problem client lizard pioneer submit female collect"
   ganache:
     image: trufflesuite/ganache-cli:v6.12.0
     command: >
@@ -13,8 +21,8 @@ services:
       - 8545:8545
   contracts:
     image: lok52/zp-contracts:latest
-    depends_on:
-      - ganache
+    environment:
+      - NETWORK=docker_anvil
   redis:
     container_name: redis
     command: [redis-server, --port, '6379', --appendonly, 'yes']
