@@ -1,5 +1,5 @@
 import Web3 from 'web3'
-import type { TransactionConfig} from 'web3-core'
+import type { TransactionConfig } from 'web3-core'
 
 export async function signAndSend(
   {

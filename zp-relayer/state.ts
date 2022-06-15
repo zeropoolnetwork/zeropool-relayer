@@ -112,7 +112,12 @@ export class PoolState {
     this.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
   }
 
-  async getTransactions(limit: number, offset: number): Promise<{ txs: string[], nextOffset: number }> {
+  rollbackTo(otherState: PoolState) {
+    const otherStateNextIndex = otherState.tree.getNextIndex()
+    this.tree.rollback(otherStateNextIndex)
+  }
+
+  async getTransactions(limit: number, offset: number) {
     const txs: string[] = []
     let nextOffset = Math.floor(offset / OUTPLUSONE) * OUTPLUSONE
     for (let i = 0; i < limit; i++) {

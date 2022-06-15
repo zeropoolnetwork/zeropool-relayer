@@ -3,6 +3,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { SENT_TX_QUEUE_NAME } from './utils/constants'
+import { RelayerKeys, updateField, readNonce } from './utils/redisFields'
 import { pool } from './pool'
 import { SentTxPayload } from './services/sentTxQueue'
 import { redis } from './services/redisClient'
@@ -46,12 +47,19 @@ export async function createSentTxWorker() {
 
         return txHash
       } else { // Revert
-        logger.debug('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
+        logger.error('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
         const failTxs = await collectBatch(sentTxWorker, MAX_SENT_LIMIT + 1)
+        logger.info('Moving all sent jobs to tx queue...')
         for (const failTxJob of failTxs) {
           const newJob = await poolTxQueue.add('tx', failTxJob.data.payload)
           logger.debug('%s Moved job %s to main queue: %s', logPrefix, failTxJob.id, newJob.id)
         }
+
+        logger.info('Rollback optimistic state...')
+        pool.optimisticState.rollbackTo(pool.state)
+        const root1 = pool.state.getMerkleRoot()
+        const root2 = pool.optimisticState.getMerkleRoot()
+        logger.info(`Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`)
       }
     } else { // Not mined
       logger.error('Unsupported')
