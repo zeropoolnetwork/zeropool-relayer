@@ -19,6 +19,12 @@ const {
   GAS_PRICE,
 } = process.env as Record<PropertyKey, string>
 
+const WORKER_OPTIONS = {
+  autorun: false,
+  connection: redis,
+  concurrency: 1,
+}
+
 export async function createPoolTxWorker() {
   await updateField(RelayerKeys.NONCE, await readNonce(true))
   const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
@@ -81,11 +87,7 @@ export async function createPoolTxWorker() {
     }
 
     return txHash
-  }, {
-    autorun: false,
-    connection: redis,
-    concurrency: 1,
-  })
+  }, WORKER_OPTIONS)
 
   return poolTxWorker
 }

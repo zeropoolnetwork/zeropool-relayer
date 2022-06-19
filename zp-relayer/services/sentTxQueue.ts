@@ -20,5 +20,5 @@ const sentTxQueueScheduler = new QueueScheduler(SENT_TX_QUEUE_NAME, {
 })
 
 export const sentTxQueue = new Queue<SentTxPayload, string>(SENT_TX_QUEUE_NAME, {
-  connection: redis
+  connection: redis,
 })
