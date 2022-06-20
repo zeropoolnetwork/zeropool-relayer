@@ -58,12 +58,11 @@ export async function createSentTxWorker() {
         return txHash
       } else { // Revert
         logger.error('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
-        const failTxs = await collectBatch(sentTxQueue)
-        logger.info('Moving all sent jobs to tx queue...')
-        for (const failTxJob of failTxs) {
-          const newJob = await poolTxQueue.add('tx', failTxJob.data.payload)
-          logger.debug('%s Moved job %s to main queue: %s', logPrefix, failTxJob.id, newJob.id)
-        }
+
+        // TODO: a more efficient strategy would be to collect all other jobs
+        // and move them to 'failed' state as we know they will be reverted
+        // To do this we need to acquire a lock for each job. Did not find
+        // an easy way to do that yet. See 'collectBatch'
 
         logger.info('Rollback optimistic state...')
         pool.optimisticState.rollbackTo(pool.state)
@@ -78,5 +77,10 @@ export async function createSentTxWorker() {
       // to maintain correct ordering
     }
   }, WORKER_OPTIONS)
+
+  sentTxWorker.on('error', e => {
+    logger.info('SENT_WORKER ERR: %o', e)
+  })
+
   return sentTxWorker
 }

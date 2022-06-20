@@ -37,7 +37,7 @@ export async function createPoolTxWorker() {
 
     const nonce = await incrNonce()
     logger.info(`${logPrefix} nonce: ${nonce}`)
-    
+
     let txHash: string
     try {
       txHash = await signAndSend(
@@ -88,6 +88,10 @@ export async function createPoolTxWorker() {
 
     return txHash
   }, WORKER_OPTIONS)
+
+  poolTxWorker.on('error', e => {
+    logger.info('POOL_WORKER ERR: %o', e)
+  })
 
   return poolTxWorker
 }
