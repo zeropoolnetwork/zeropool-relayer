@@ -1,22 +1,33 @@
-import { Job, Worker } from 'bullmq'
+import { Job, Queue, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { SENT_TX_QUEUE_NAME } from './utils/constants'
+import { RelayerKeys, updateField, readNonce } from './utils/redisFields'
 import { pool } from './pool'
-import { SentTxPayload } from './services/sentTxQueue'
+import { SentTxPayload, sentTxQueue } from './services/sentTxQueue'
 import { redis } from './services/redisClient'
 
 const token = 'RELAYER'
 const MAX_SENT_LIMIT = 10
 
-async function collectBatch<T>(worker: Worker<T>, maxSize: number) {
-  const jobs: Job<T>[] = []
-  for (let i = 0; i < maxSize; i++) {
-    const job = await worker.getNextJob(token);
-    if (job) jobs.push(job)
-    else return jobs
-  }
+const WORKER_OPTIONS = {
+  autorun: false,
+  connection: redis,
+  concurrency: 1,
+}
+
+async function collectBatch<T>(queue: Queue<T>) {
+  const jobs = await queue.getJobs(['delayed', 'waiting'])
+
+  await Promise.all(jobs.map(async j => {
+    // TODO fix "Missing lock for job" error
+    await j.moveToFailed({
+      message: 'rescheduled',
+      name: 'RescheduledError'
+    }, token)
+  }))
+
   return jobs
 }
 
@@ -46,19 +57,30 @@ export async function createSentTxWorker() {
 
         return txHash
       } else { // Revert
-        logger.debug('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
-        const failTxs = await collectBatch(sentTxWorker, MAX_SENT_LIMIT + 1)
-        for (const failTxJob of failTxs) {
-          const newJob = await poolTxQueue.add('tx', failTxJob.data.payload)
-          logger.debug('%s Moved job %s to main queue: %s', logPrefix, failTxJob.id, newJob.id)
-        }
+        logger.error('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
+
+        // TODO: a more efficient strategy would be to collect all other jobs
+        // and move them to 'failed' state as we know they will be reverted
+        // To do this we need to acquire a lock for each job. Did not find
+        // an easy way to do that yet. See 'collectBatch'
+
+        logger.info('Rollback optimistic state...')
+        pool.optimisticState.rollbackTo(pool.state)
+        const root1 = pool.state.getMerkleRoot()
+        const root2 = pool.optimisticState.getMerkleRoot()
+        logger.info(`Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`)
       }
     } else { // Not mined
       logger.error('Unsupported')
+      // TODO:
+      // Maybe increase gasPrice and need to reschedule all other queue jobs
+      // to maintain correct ordering
     }
-  }, {
-    autorun: false,
-    connection: redis
+  }, WORKER_OPTIONS)
+
+  sentTxWorker.on('error', e => {
+    logger.info('SENT_WORKER ERR: %o', e)
   })
+
   return sentTxWorker
 }

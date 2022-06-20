@@ -1,6 +1,6 @@
 {
   "name": "zp-relayer",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
@@ -19,7 +19,7 @@
     "express": "^4.17.1",
     "express-winston": "4.2.0",
     "ioredis": "4.27.10",
-    "libzkbob-rs-node": "0.1.26",
+    "libzkbob-rs-node": "0.1.27",
     "node-fetch": "^2.6.1",
     "promise-retry": "^2.0.1",
     "ts-node": "^10.1.0",

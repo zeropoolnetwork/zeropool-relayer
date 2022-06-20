@@ -19,6 +19,12 @@ const {
   GAS_PRICE,
 } = process.env as Record<PropertyKey, string>
 
+const WORKER_OPTIONS = {
+  autorun: false,
+  connection: redis,
+  concurrency: 1,
+}
+
 export async function createPoolTxWorker() {
   await updateField(RelayerKeys.NONCE, await readNonce(true))
   const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
@@ -31,19 +37,27 @@ export async function createPoolTxWorker() {
 
     const nonce = await incrNonce()
     logger.info(`${logPrefix} nonce: ${nonce}`)
-    const txHash = await signAndSend(
-      {
-        data,
-        nonce,
-        gasPrice: GAS_PRICE,
-        value: toWei(toBN(amount)),
-        gas,
-        to: config.poolAddress,
-        chainId: pool.chainId,
-      },
-      RELAYER_ADDRESS_PRIVATE_KEY,
-      web3
-    )
+
+    let txHash: string
+    try {
+      txHash = await signAndSend(
+        {
+          data,
+          nonce,
+          gasPrice: GAS_PRICE,
+          value: toWei(toBN(amount)),
+          gas,
+          to: config.poolAddress,
+          chainId: pool.chainId,
+        },
+        RELAYER_ADDRESS_PRIVATE_KEY,
+        web3
+      )
+    } catch (e) {
+      logger.error(`${logPrefix} Send TX failed: ${e}`)
+      throw e
+    }
+
     logger.debug(`${logPrefix} TX hash ${txHash}`)
 
     await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
@@ -73,10 +87,10 @@ export async function createPoolTxWorker() {
     }
 
     return txHash
-  }, {
-    autorun: false,
-    connection: redis,
-    concurrency: 1,
+  }, WORKER_OPTIONS)
+
+  poolTxWorker.on('error', e => {
+    logger.info('POOL_WORKER ERR: %o', e)
   })
 
   return poolTxWorker
