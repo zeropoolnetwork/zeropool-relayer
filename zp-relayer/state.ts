@@ -113,8 +113,20 @@ export class PoolState {
   }
 
   rollbackTo(otherState: PoolState) {
+    const stateNextIndex = this.tree.getNextIndex()
     const otherStateNextIndex = otherState.tree.getNextIndex()
+
+    if (stateNextIndex >= otherStateNextIndex) {
+      return
+    }
+
+    // Rollback merkle tree
     this.tree.rollback(otherStateNextIndex)
+
+    // Clear optimistic txs
+    for (let i = otherStateNextIndex; i < stateNextIndex; i += OUTPLUSONE) {
+      this.txs.delete(i)
+    }
   }
 
   async getTransactions(limit: number, offset: number) {
