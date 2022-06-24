@@ -116,7 +116,8 @@ export class PoolState {
     const stateNextIndex = this.tree.getNextIndex()
     const otherStateNextIndex = otherState.tree.getNextIndex()
 
-    if (stateNextIndex >= otherStateNextIndex) {
+    // Index of other state should be less than index of current state
+    if (!(otherStateNextIndex < stateNextIndex)) {
       return
     }
 
