@@ -29,7 +29,7 @@ const txProof = (() => {
 })()
 
 async function transaction(req: Request, res: Response, next: NextFunction) {
-  const { proof, memo, txType, depositSignature } = JSON.parse(req.body)
+  const { proof, memo, txType, depositSignature } = typeof(req.body) == "object"? req.body: JSON.parse(req.body)
   try {
     const jobId = await pool.transact(proof, memo, txType, depositSignature)
     res.json({ jobId })
