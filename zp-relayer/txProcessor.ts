@@ -90,13 +90,13 @@ export async function processTx(job: Job<TxPayload>, pool: Pool) {
     commitIndex
   } = pool.optimisticState.getVirtualTreeProofInputs(outCommit)
 
-  logger.debug('Proving tree...')
+  logger.debug(`${logPrefix} Proving tree...`)
   const treeProof = await Proof.treeAsync(
     pool.treeParams,
     pub,
     sec
   )
-  logger.debug('Tree proved')
+  logger.debug(`${logPrefix} Tree proved`)
 
   const data = buildTxData({
     txProof: txProof.proof,

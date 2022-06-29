@@ -1,6 +1,6 @@
 import BN from 'bn.js'
 import { toBN } from 'web3-utils'
-import { TxType, TxData, WithdrawTxData } from 'zp-memo-parser'
+import { TxType, TxData, WithdrawTxData, PermittableDepositTxData, getTxData } from 'zp-memo-parser'
 import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
 import { config } from './config/config'
@@ -100,4 +100,67 @@ export async function checkAssertion(f: Function, errStr: string) {
     logger.error(errStr)
     throw new Error(errStr)
   }
+}
+
+interface ValidateTx {
+  txType: TxType
+  txProof: Proof
+  rawMemo: string
+}
+
+export async function validateTx(
+  { txType, txProof, rawMemo }: ValidateTx,
+  maxPoolIndex: number
+) {
+  await checkAssertion(
+    () => checkNullifier(txProof.inputs[1]),
+    `Doublespend detected`
+  )
+
+  const buf = Buffer.from(rawMemo, 'hex')
+  const txData = getTxData(buf, txType)
+
+  await checkAssertion(
+    () => checkFee(txData.fee),
+    `Fee too low`
+  )
+
+  if (txType === TxType.WITHDRAWAL) {
+    const nativeAmount = (txData as WithdrawTxData).nativeAmount
+    await checkAssertion(
+      () => checkNativeAmount(nativeAmount),
+      `Native amount too high`
+    )
+  }
+
+  if (txType === TxType.PERMITTABLE_DEPOSIT) {
+    const deadline = (txData as PermittableDepositTxData).deadline
+    await checkAssertion(
+      () => checkDeadline(deadline),
+      `Deadline is expired`
+    )
+  }
+
+  await checkAssertion(
+    () => checkTxProof(txProof),
+    `Incorrect transfer proof`
+  )
+
+  const delta = parseDelta(txProof.inputs[3])
+
+  await checkAssertion(
+    () => checkTransferIndex(toBN(maxPoolIndex), delta.transferIndex),
+    `Incorrect transfer index`
+  )
+
+  await checkAssertion(
+    () => checkTxSpecificFields(
+      txType,
+      delta.tokenAmount,
+      delta.energyAmount,
+      txData,
+      toBN('0')
+    ),
+    `Tx specific fields are incorrect`
+  )
 }

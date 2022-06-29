@@ -15,20 +15,10 @@ import {
   SnarkProof,
   VK,
 } from 'libzkbob-rs-node'
-import {
-  checkAssertion,
-  checkNativeAmount,
-  checkFee,
-  checkNullifier,
-  checkTransferIndex,
-  checkTxProof,
-  checkTxSpecificFields,
-  parseDelta,
-  checkDeadline,
-} from './validation'
+import { validateTx } from './validation'
 import { PoolState } from './state'
 
-import { getTxData, TxType, WithdrawTxData, PermittableDepositTxData } from 'zp-memo-parser'
+import { TxType } from 'zp-memo-parser'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { OUTPLUSONE } from './utils/constants'
@@ -64,61 +54,10 @@ class Pool {
   }
 
   async transact(txProof: Proof, rawMemo: string, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
+    // Note: Here we use `maxPoolIndex` from optimistic state
+    await validateTx({ txType, txProof, rawMemo }, this.optimisticState.getNextIndex())
+
     logger.debug('Adding tx job to queue')
-
-    await checkAssertion(
-      () => checkNullifier(txProof.inputs[1]),
-      `Doublespend detected`
-    )
-
-    const buf = Buffer.from(rawMemo, 'hex')
-    const txData = getTxData(buf, txType)
-
-    await checkAssertion(
-      () => checkFee(txData.fee),
-      `Fee too low`
-    )
-
-    if (txType === TxType.WITHDRAWAL) {
-      const nativeAmount = (txData as WithdrawTxData).nativeAmount
-      await checkAssertion(
-        () => checkNativeAmount(nativeAmount),
-        `Native amount too high`
-      )
-    }
-
-    if (txType === TxType.PERMITTABLE_DEPOSIT) {
-      const deadline = (txData as PermittableDepositTxData).deadline
-      await checkAssertion(
-        () => checkDeadline(deadline),
-        `Deadline is expired`
-      )
-    }
-
-    await checkAssertion(
-      () => checkTxProof(txProof),
-      `Incorrect transfer proof`
-    )
-
-    const contractTransferIndex = await this.getContractIndex()
-    const delta = parseDelta(txProof.inputs[3])
-
-    await checkAssertion(
-      () => checkTransferIndex(toBN(contractTransferIndex), delta.transferIndex),
-      `Incorrect transfer index`
-    )
-
-    await checkAssertion(
-      () => checkTxSpecificFields(
-        txType,
-        delta.tokenAmount,
-        delta.energyAmount,
-        txData,
-        toBN('0')
-      ),
-      `Tx specific fields are incorrect`
-    )
-
     const job = await poolTxQueue.add('tx', {
       amount: '0',
       gas: config.relayerGasLimit.toString(),
