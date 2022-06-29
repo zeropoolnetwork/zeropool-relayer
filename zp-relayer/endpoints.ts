@@ -29,7 +29,7 @@ const txProof = (() => {
 })()
 
 async function transaction(req: Request, res: Response, next: NextFunction) {
-  const { proof, memo, txType, depositSignature } = typeof(req.body) == "object"? req.body: JSON.parse(req.body)
+  const { proof, memo, txType, depositSignature } = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
   try {
     const jobId = await pool.transact(proof, memo, txType, depositSignature)
     res.json({ jobId })
@@ -105,9 +105,14 @@ async function getJob(req: Request, res: Response) {
   if (job) {
     const state = await job.getState()
     const txHash = job.returnvalue
+    const createdOn = job.timestamp
+    const finishedOn = job.finishedOn
+
     res.json({
       state,
       txHash,
+      createdOn,
+      finishedOn,
     })
   } else {
     res.json(`Job ${jobId} not found`)
