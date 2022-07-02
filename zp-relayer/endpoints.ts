@@ -143,11 +143,15 @@ async function getJob(req: Request, res: Response) {
 
 function relayerInfo(req: Request, res: Response) {
   const deltaIndex = pool.state.getNextIndex()
+  const optimisticDeltaIndex = pool.optimisticState.getNextIndex()
   const root = pool.state.getMerkleRoot()
+  const optimisticRoot = pool.optimisticState.getMerkleRoot()
 
   res.json({
     root,
+    optimisticRoot,
     deltaIndex,
+    optimisticDeltaIndex,
   })
 }
 
