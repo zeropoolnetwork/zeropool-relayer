@@ -56,3 +56,9 @@ export function flattenProof(p: SnarkProof): string {
     return hex
   }).join('')
 }
+
+export async function setIntervalAndRun(f: () => (Promise<void> | void), interval: number) {
+  const handler = setInterval(f, interval)
+  await f()
+  return handler
+}
