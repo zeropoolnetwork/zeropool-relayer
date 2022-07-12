@@ -15,10 +15,7 @@ import { config } from './config/config'
 import { redis } from './services/redisClient'
 import { checkAssertion, checkTransferIndex, parseDelta } from './validation'
 
-const {
-  RELAYER_ADDRESS_PRIVATE_KEY,
-  GAS_PRICE,
-} = process.env as Record<PropertyKey, string>
+const { RELAYER_ADDRESS_PRIVATE_KEY, GAS_PRICE } = process.env as Record<PropertyKey, string>
 
 const WORKER_OPTIONS = {
   autorun: false,

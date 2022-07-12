@@ -1,8 +1,7 @@
-const path = require('path');
-const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
+const path = require('path')
+const NodePolyfillPlugin = require('node-polyfill-webpack-plugin')
 
-const isProduction = process.env.NODE_ENV == 'production';
-
+const isProduction = process.env.NODE_ENV == 'production'
 
 const config = {
   entry: './src/index.ts',
@@ -11,7 +10,7 @@ const config = {
   },
   plugins: [
     new NodePolyfillPlugin({
-      excludeAliases: ["console"]
+      excludeAliases: ['console'],
     }),
   ],
   module: {
@@ -19,7 +18,7 @@ const config = {
       {
         test: /\.(ts|tsx)$/i,
         loader: 'ts-loader',
-        exclude: path.resolve(__dirname, "node_modules"),
+        exclude: path.resolve(__dirname, 'node_modules'),
       },
       {
         test: /\.(eot|svg|ttf|woff|woff2|png|jpg|gif)$/i,
@@ -28,7 +27,7 @@ const config = {
       {
         test: /\.json$/,
         use: ['json-loader'],
-        type: 'javascript/auto'
+        type: 'javascript/auto',
       },
     ],
   },
@@ -40,15 +39,15 @@ const config = {
   },
   experiments: {
     asyncWebAssembly: true,
-    topLevelAwait: true
+    topLevelAwait: true,
   },
-};
+}
 
 module.exports = () => {
   if (isProduction) {
-    config.mode = 'production';
+    config.mode = 'production'
   } else {
-    config.mode = 'development';
+    config.mode = 'development'
   }
-  return config;
-};
+  return config
+}

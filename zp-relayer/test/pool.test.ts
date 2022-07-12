@@ -25,6 +25,6 @@ describe('Pool', () => {
 
     expect(out_commit_calc).eq(out_commit_node)
 
-    fs.rmdirSync(DB_PATH, { recursive: true });
+    fs.rmdirSync(DB_PATH, { recursive: true })
   })
 })

@@ -7,16 +7,13 @@ import { pool } from '../pool'
 
 export enum RelayerKeys {
   TRANSFER_NUM = 'relayer:transferNum',
-  NONCE = `relayer:nonce`
+  NONCE = `relayer:nonce`,
 }
 
 export const readNonce = readFieldBuilder(RelayerKeys.NONCE, () => getNonce(web3, config.relayerAddress))
 export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractIndex())
 
-function readFieldBuilder(
-  key: RelayerKeys,
-  forceUpdateFunc?: Function,
-) {
+function readFieldBuilder(key: RelayerKeys, forceUpdateFunc?: Function) {
   return async (forceUpdate?: boolean) => {
     const update = () => {
       if (!forceUpdateFunc) throw new Error('Force update function not provided')

@@ -6,9 +6,7 @@ import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { config } from './config/config'
 
-const {
-  TX_PROOFS_DIR,
-} = process.env as Record<PropertyKey, string>
+const { TX_PROOFS_DIR } = process.env as Record<PropertyKey, string>
 
 const txProof = (() => {
   let txProofNum = 0
@@ -71,16 +69,16 @@ async function merkleRoot(req: Request, res: Response, next: NextFunction) {
 }
 
 async function getTransactions(req: Request, res: Response, next: NextFunction) {
-  const limit = Number(req.query.limit as string || '100')
+  const limit = Number((req.query.limit as string) || '100')
   const isOptimistic = req.query.optimistic === 'true'
   if (isNaN(limit) || limit <= 0) {
-    next(new Error("limit must be a positive number"))
+    next(new Error('limit must be a positive number'))
     return
   }
 
-  const offset = Number(req.query.offset as string || '0')
+  const offset = Number((req.query.offset as string) || '0')
   if (isNaN(offset) || offset < 0) {
-    next(new Error("offset must be a positive number or zero"))
+    next(new Error('offset must be a positive number or zero'))
     return
   }
 
@@ -90,15 +88,15 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
 }
 
 async function getTransactionsV2(req: Request, res: Response, next: NextFunction) {
-  const limit = Number(req.query.limit as string || '100')
+  const limit = Number((req.query.limit as string) || '100')
   if (isNaN(limit) || limit <= 0) {
-    next(new Error("limit must be a positive number"))
+    next(new Error('limit must be a positive number'))
     return
   }
 
-  const offset = Number(req.query.offset as string || '0')
+  const offset = Number((req.query.offset as string) || '0')
   if (isNaN(offset) || offset < 0) {
-    next(new Error("offset must be a positive number or zero"))
+    next(new Error('offset must be a positive number or zero'))
     return
   }
 

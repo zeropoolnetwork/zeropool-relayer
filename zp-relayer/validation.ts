@@ -33,7 +33,8 @@ export function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
 }
 
 export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, txData: TxData, msgValue: BN) {
-  logger.debug('TOKENS %s, ENERGY %s, TX DATA %s, MSG VALUE %s',
+  logger.debug(
+    'TOKENS %s, ENERGY %s, TX DATA %s, MSG VALUE %s',
     tokenAmount.toString(),
     energyAmount.toString(),
     JSON.stringify(txData),
@@ -109,6 +110,7 @@ interface ValidateTx {
   rawMemo: string
 }
 
+<<<<<<< HEAD
 export async function validateTx(
   { txType, txProof, rawMemo }: ValidateTx
 ) {
@@ -116,38 +118,31 @@ export async function validateTx(
     () => checkNullifier(txProof.inputs[1]),
     `Doublespend detected`
   )
+=======
+export async function validateTx({ txType, txProof, rawMemo }: ValidateTx, maxPoolIndex: number) {
+  await checkAssertion(() => checkNullifier(txProof.inputs[1]), `Doublespend detected`)
+>>>>>>> ac1438b (Add prettier)
 
   const buf = Buffer.from(rawMemo, 'hex')
   const txData = getTxData(buf, txType)
 
-  await checkAssertion(
-    () => checkFee(txData.fee),
-    `Fee too low`
-  )
+  await checkAssertion(() => checkFee(txData.fee), `Fee too low`)
 
   if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
-    await checkAssertion(
-      () => checkNativeAmount(nativeAmount),
-      `Native amount too high`
-    )
+    await checkAssertion(() => checkNativeAmount(nativeAmount), `Native amount too high`)
   }
 
   if (txType === TxType.PERMITTABLE_DEPOSIT) {
     const deadline = (txData as PermittableDepositTxData).deadline
-    await checkAssertion(
-      () => checkDeadline(deadline),
-      `Deadline is expired`
-    )
+    await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
   }
 
-  await checkAssertion(
-    () => checkTxProof(txProof),
-    `Incorrect transfer proof`
-  )
+  await checkAssertion(() => checkTxProof(txProof), `Incorrect transfer proof`)
 
   const delta = parseDelta(txProof.inputs[3])
 
+<<<<<<< HEAD
   await checkAssertion(
     () => checkTxSpecificFields(
       txType,
@@ -156,6 +151,12 @@ export async function validateTx(
       txData,
       toBN('0')
     ),
+=======
+  await checkAssertion(() => checkTransferIndex(toBN(maxPoolIndex), delta.transferIndex), `Incorrect transfer index`)
+
+  await checkAssertion(
+    () => checkTxSpecificFields(txType, delta.tokenAmount, delta.energyAmount, txData, toBN('0')),
+>>>>>>> ac1438b (Add prettier)
     `Tx specific fields are incorrect`
   )
 }

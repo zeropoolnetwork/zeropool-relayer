@@ -2,15 +2,7 @@ import Web3 from 'web3'
 import type { TransactionConfig } from 'web3-core'
 
 export async function signAndSend(
-  {
-    data,
-    nonce,
-    gasPrice,
-    value,
-    gas,
-    to,
-    chainId,
-  }: TransactionConfig,
+  { data, nonce, gasPrice, value, gas, to, chainId }: TransactionConfig,
   privateKey: string,
   web3: Web3
 ): Promise<string> {
@@ -22,7 +14,7 @@ export async function signAndSend(
       data,
       value,
       gasPrice,
-      gas
+      gas,
     },
     privateKey
   )

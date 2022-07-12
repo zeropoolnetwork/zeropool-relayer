@@ -22,7 +22,7 @@ services:
   contracts:
     image: lok52/zp-contracts:latest
     environment:
-      - NETWORK=docker_anvil
+      - NETWORK=docker_ganache
   redis:
     container_name: redis
     command: [redis-server, --port, '6379', --appendonly, 'yes']

@@ -1,11 +1,13 @@
 import type Web3 from 'web3'
+import type { ProviderLike } from '@mycrypto/eth-scan'
 import { toBN, toWei } from 'web3-utils'
-import { config } from '../../config/config'
-import { setIntervalAndRun } from '../../utils/helpers'
+import { config } from '../config/config'
+import { setIntervalAndRun } from '../utils/helpers'
 import { estimateFees } from '@mycrypto/gas-estimation'
 import { GasPriceOracle } from 'gas-price-oracle'
 import type { GasPriceKey } from 'gas-price-oracle/lib/types'
 
+// GasPrice fields
 interface LegacyGasOptions {
   gasPrice: string
 }
@@ -15,12 +17,13 @@ interface EIP1559GasOptions {
 }
 type GasPriceOptions = LegacyGasOptions | EIP1559GasOptions
 
+// Estimation types
 type EstimationEIP1559 = 'eip1559-gas-estimation'
 type EstimationOracle = 'gas-price-oracle'
 type EstimationWeb3 = 'web3'
 type EstimationType = EstimationEIP1559 | EstimationOracle | EstimationWeb3
 
-type EstimationOracleOptions = { speedType: GasPriceKey, factor: number }
+type EstimationOracleOptions = { speedType: GasPriceKey; factor: number }
 type EstimationOptions<ET extends EstimationType> = ET extends EstimationOracle ? EstimationOracleOptions : {}
 
 type FetchFunc<ET extends EstimationType> = (_: EstimationOptions<ET>) => Promise<GasPriceOptions>
@@ -46,29 +49,25 @@ class GasPrice<ET extends EstimationType> {
 
     this.cachedGasPriceOptions = { gasPrice: config.gasPrice }
 
-    this.fetchGasPriceInterval = await setIntervalAndRun(
-      async () => {
-        this.cachedGasPriceOptions = await this.fetchGasPrice(this.options)
-      },
-      this.updateInterval
-    )
+    this.fetchGasPriceInterval = await setIntervalAndRun(async () => {
+      this.cachedGasPriceOptions = await this.fetchGasPrice(this.options)
+    }, this.updateInterval)
   }
 
   private getFetchFunc(estimationType: ET): FetchFunc<ET> {
     const funcs: Record<EstimationType, FetchFunc<EstimationType>> = {
       'web3': this.fetchGasPriceWeb3,
       'eip1559-gas-estimation': this.fetchGasPriceEIP1559,
-      'gas-price-oracle': this.fetchGasPriceOracle
+      'gas-price-oracle': this.fetchGasPriceOracle,
     }
     return funcs[estimationType]
   }
 
   private fetchGasPriceEIP1559: FetchFunc<EstimationEIP1559> = async () => {
-    // @ts-ignore
-    const options = await estimateFees(this.web3)
+    const options = await estimateFees(this.web3 as ProviderLike)
     const res = {
       maxFeePerGas: options.maxFeePerGas.toString(10),
-      maxPriorityFeePerGas: options.maxPriorityFeePerGas.toString(10)
+      maxPriorityFeePerGas: options.maxPriorityFeePerGas.toString(10),
     }
     return res
   }
@@ -79,13 +78,10 @@ class GasPrice<ET extends EstimationType> {
   }
 
   // TODO: defaults to Mainnet; provide options for other supported oracles
-  private fetchGasPriceOracle: FetchFunc<EstimationOracle> = async (options) => {
+  private fetchGasPriceOracle: FetchFunc<EstimationOracle> = async options => {
     const gasPriceOracle = new GasPriceOracle()
     const json = await gasPriceOracle.fetchGasPricesOffChain()
-    const gasPrice = GasPrice.normalizeGasPrice(
-      json[options.speedType],
-      options.factor
-    ).toString(10)
+    const gasPrice = GasPrice.normalizeGasPrice(json[options.speedType], options.factor).toString(10)
     return { gasPrice }
   }
 

@@ -11,13 +11,11 @@ import { config } from './config/config'
 import { pool } from './pool'
 
 pool.init().then(async () => {
-  (await createPoolTxWorker()).run();
-  (await createSentTxWorker()).run();
+  ;(await createPoolTxWorker()).run()
+  ;(await createSentTxWorker()).run()
 })
 
-const {
-  TX_PROOFS_DIR,
-} = process.env as Record<PropertyKey, string>
+const { TX_PROOFS_DIR } = process.env as Record<PropertyKey, string>
 
 fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
 

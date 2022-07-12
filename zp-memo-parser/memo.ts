@@ -13,17 +13,17 @@ export enum TxType {
 }
 
 interface DefaultTxData {
-  fee: BN,
+  fee: BN
 }
 
 export interface WithdrawTxData extends DefaultTxData {
-  nativeAmount: BN,
-  reciever: Uint8Array,
+  nativeAmount: BN
+  reciever: Uint8Array
 }
 
 export interface PermittableDepositTxData extends DefaultTxData {
-  deadline: BN,
-  holder: Uint8Array,
+  deadline: BN
+  holder: Uint8Array
 }
 
 export type TxData = DefaultTxData | WithdrawTxData | PermittableDepositTxData
@@ -33,15 +33,17 @@ const U256_SIZE = 32
 const POLY_1305_TAG_SIZE = 16
 const ACCOUNT_SIZE = 70
 const NOTE_SIZE = 60
-const ZERO_NOTE_HASH = Uint8Array.from([205, 67, 21, 69, 218, 80, 86, 210, 193, 254, 80, 77, 140, 200, 120, 159, 225, 78, 91, 230, 207, 158, 63, 231, 197, 180, 251, 16, 82, 219, 170, 14])
-
+const ZERO_NOTE_HASH = Uint8Array.from([
+  205, 67, 21, 69, 218, 80, 86, 210, 193, 254, 80, 77, 140, 200, 120, 159, 225, 78, 91, 230, 207, 158, 63, 231, 197,
+  180, 251, 16, 82, 219, 170, 14,
+])
 
 class Assignable {
   constructor(properties: Object) {
-    Object.keys(properties).map((key) => {
+    Object.keys(properties).map(key => {
       // @ts-ignore
-      this[key] = properties[key];
-    });
+      this[key] = properties[key]
+    })
   }
 }
 
@@ -66,10 +68,15 @@ function clientBorshSchema(numNotes: number) {
     fields.push([`a_${i}_x`, 'u256'])
     fields.push([`noteCiphertext_${i}`, [NOTE_SIZE + POLY_1305_TAG_SIZE]])
   }
-  return new Map([[Memo, {
-    kind: 'struct',
-    fields
-  }]])
+  return new Map([
+    [
+      Memo,
+      {
+        kind: 'struct',
+        fields,
+      },
+    ],
+  ])
 }
 
 function getNoteHashes(rawHashes: Buffer, num: number, maxNotes: number): Uint8Array[] {

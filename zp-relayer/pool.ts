@@ -110,8 +110,8 @@ class Pool {
     const events = await getEvents(this.PoolInstance, 'Message', {
       fromBlock,
       filter: {
-        index: missedIndices
-      }
+        index: missedIndices,
+      },
     })
 
     if (events.length !== missedIndices.length) {

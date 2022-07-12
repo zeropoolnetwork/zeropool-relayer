@@ -5,10 +5,9 @@ import { FALLBACK_RPC_URL_SWITCH_TIMEOUT } from '../utils/constants'
 // From EIP-1474 and Infura documentation
 const JSONRPC_ERROR_CODES = [-32603, -32002, -32005]
 
-
 interface ProviderOptions {
-  name: string,
-  requestTimeout: number,
+  name: string
+  requestTimeout: number
   retry: {
     retries: number
   }
@@ -18,8 +17,8 @@ const defaultOptions: ProviderOptions = {
   name: 'main',
   requestTimeout: 0,
   retry: {
-    retries: 0
-  }
+    retries: 0,
+  },
 }
 
 class HttpListProviderError extends Error {
@@ -77,20 +76,20 @@ export default class HttpListProvider {
       callback(null, result)
     } catch (e) {
       callback(e)
-    }    
+    }
   }
 
   async trySend(payload: any, initialIndex: number) {
     const errors: any = []
-  
+
     for (let count = 0; count < this.urls.length; count++) {
       const index = (initialIndex + count) % this.urls.length
-  
+
       // when request is being sent to the primary URL, the corresponding time marker is updated
       if (index === 0) {
         this.lastTimeUsedPrimary = Date.now()
       }
-  
+
       const url = this.urls[index]
       try {
         const result = await this._send(url, payload, this.options)
@@ -99,18 +98,18 @@ export default class HttpListProvider {
         errors.push(e)
       }
     }
-  
+
     throw new HttpListProviderError('Request failed for all urls', errors)
   }
 
   async _send(url: RequestInfo, payload: any, options: ProviderOptions) {
     const rawResponse = await fetch(url, {
       headers: {
-        'Content-type': 'application/json'
+        'Content-type': 'application/json',
       },
       method: 'POST',
       body: JSON.stringify(payload),
-      timeout: options.requestTimeout
+      timeout: options.requestTimeout,
     })
 
     if (!rawResponse.ok) {

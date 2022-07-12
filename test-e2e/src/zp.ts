@@ -5,7 +5,17 @@ import { decodeMemo } from 'zp-memo-parser'
 import TokenAbi from './token-abi.json'
 import { postData, numToHex, fakeTxProof, packSignature } from './utils'
 import { rpcUrl, relayerUrl, tokenAddress, zpAddress, energyAddress } from './constants.json'
-import { UserAccount, UserState, getConstants, Helpers, IWithdrawData, IDepositData, ITransferData, Proof, Params } from 'libzeropool-rs-wasm-bundler'
+import {
+  UserAccount,
+  UserState,
+  getConstants,
+  Helpers,
+  IWithdrawData,
+  IDepositData,
+  ITransferData,
+  Proof,
+  Params,
+} from 'libzeropool-rs-wasm-bundler'
 
 export const web3 = new Web3(rpcUrl)
 export const token = new web3.eth.Contract(TokenAbi as any, tokenAddress)
@@ -44,11 +54,7 @@ interface SyncAccountsOptions {
 
 export async function syncNotesAndAccount(
   account: UserAccount,
-  {
-    limit = 20n,
-    offset = 0n,
-    optimistic = true
-  }: SyncAccountsOptions
+  { limit = 20n, offset = 0n, optimistic = true }: SyncAccountsOptions
 ) {
   let url = `${relayerUrl}/transactions?limit=${limit.toString()}&offset=${offset.toString()}`
   if (optimistic) url += '&optimistic=true'
@@ -73,7 +79,7 @@ export async function syncNotesAndAccount(
 
     const memo = new Uint8Array(buf.buffer.slice(64))
 
-    const memoFields = decodeMemo(Buffer.from(memo), null);
+    const memoFields = decodeMemo(Buffer.from(memo), null)
     const hashes = [memoFields.accHash].concat(memoFields.noteHashes).map(Helpers.numToStr)
 
     const numLeafs = BigInt(constants.OUT + 1)
@@ -84,12 +90,13 @@ export async function syncNotesAndAccount(
       account.addAccount(accountOffset, hashes, pair.account, [])
     }
 
-    const notes = account.decryptNotes(memo)
+    const notes = account
+      .decryptNotes(memo)
       .filter(({ note }) => note.b !== '0')
       .map(({ note, index }) => {
         return {
           note,
-          index: parseInt(accountOffset.toString()) + 1 + index
+          index: parseInt(accountOffset.toString()) + 1 + index,
         }
       })
     if (notes.length > 0) {
@@ -102,7 +109,7 @@ interface SendTx {
   proof: any
   memo: string
   txType: string
-  depositSignature: string | null,
+  depositSignature: string | null
 }
 
 async function proofTx(mergeTx: any, fake: boolean) {
@@ -116,12 +123,14 @@ async function proofTx(mergeTx: any, fake: boolean) {
         mergeTx.public.delta,
         mergeTx.public.memo,
       ],
-      ...fakeTxProof
+      ...fakeTxProof,
     }
   } else {
     console.log('Getting proof from relayer...')
-    proof = await postData(`${relayerUrl}/proof_tx`, { pub: mergeTx.public, sec: mergeTx.secret })
-      .then(r => r.json())
+    proof = await postData(`${relayerUrl}/proof_tx`, {
+      pub: mergeTx.public,
+      sec: mergeTx.secret,
+    }).then(r => r.json())
     console.log('Received tx proof')
   }
 
@@ -155,16 +164,13 @@ export async function deposit(account: UserAccount, amount: string, pk: string, 
     amount,
   }
   const mergeTx = await account.createDeposit(deposit)
-  const depositSignature = packSignature(web3.eth.accounts.sign(
-    numToHex(web3, mergeTx.public.nullifier),
-    pk
-  ))
+  const depositSignature = packSignature(web3.eth.accounts.sign(numToHex(web3, mergeTx.public.nullifier), pk))
   const proof = await proofTx(mergeTx, fake)
   return {
     proof,
     memo: mergeTx.memo,
     depositSignature,
-    txType: '0000'
+    txType: '0000',
   }
 }
 
@@ -172,7 +178,7 @@ export async function transfer(account: UserAccount, to: string, amount: string,
   console.log('Making a transfer...')
   const transfer: ITransferData = {
     fee: '0',
-    outputs: [{ to, amount }]
+    outputs: [{ to, amount }],
   }
   const mergeTx = await account.createTransfer(transfer)
 
@@ -181,11 +187,17 @@ export async function transfer(account: UserAccount, to: string, amount: string,
     proof,
     memo: mergeTx.memo,
     depositSignature: null,
-    txType: '0001'
+    txType: '0001',
   }
 }
 
-export async function withdraw(account: UserAccount, to: Uint8Array, amount: string, energy_amount: string, fake = false): Promise<SendTx> {
+export async function withdraw(
+  account: UserAccount,
+  to: Uint8Array,
+  amount: string,
+  energy_amount: string,
+  fake = false
+): Promise<SendTx> {
   console.log('Making a withdraw...')
   const withdraw: IWithdrawData = {
     fee: '0',
@@ -200,6 +212,6 @@ export async function withdraw(account: UserAccount, to: Uint8Array, amount: str
     proof,
     memo: mergeTx.memo,
     depositSignature: null,
-    txType: '0002'
+    txType: '0002',
   }
 }

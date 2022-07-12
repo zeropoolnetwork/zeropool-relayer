@@ -4,16 +4,13 @@ import { AbiItem, toBN } from 'web3-utils'
 import { Job } from 'bullmq'
 import { logger } from './services/appLogger'
 import { TxPayload } from './services/poolTxQueue'
-import { TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE, } from './utils/constants'
+import { TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE } from './utils/constants'
 import { numToHex, flattenProof, truncateHexPrefix } from './utils/helpers'
 import { SnarkProof, Proof } from 'libzkbob-rs-node'
 import { TxType } from 'zp-memo-parser'
 import type { Pool } from './pool'
 
-import {
-  Delta,
-  parseDelta,
-} from './validation'
+import { Delta, parseDelta } from './validation'
 
 // @ts-ignore
 const PoolInstance = new Contract(PoolAbi as AbiItem[])
@@ -56,7 +53,7 @@ function buildTxData(txData: TxData) {
     treeFlatProof,
     txData.txType,
     memoSize,
-    memoMessage
+    memoMessage,
   ]
 
   if (txData.depositSignature) {
@@ -83,18 +80,10 @@ export async function processTx(id: string, tx: TxPayload, pool: Pool) {
   const delta = parseDelta(txProof.inputs[3])
 
   const outCommit = txProof.inputs[2]
-  const {
-    pub,
-    sec,
-    commitIndex
-  } = pool.optimisticState.getVirtualTreeProofInputs(outCommit)
+  const { pub, sec, commitIndex } = pool.optimisticState.getVirtualTreeProofInputs(outCommit)
 
   logger.debug(`${logPrefix} Proving tree...`)
-  const treeProof = await Proof.treeAsync(
-    pool.treeParams,
-    pub,
-    sec
-  )
+  const treeProof = await Proof.treeAsync(pool.treeParams, pub, sec)
   logger.debug(`${logPrefix} Tree proved`)
 
   const data = buildTxData({
@@ -106,7 +95,7 @@ export async function processTx(id: string, tx: TxPayload, pool: Pool) {
     delta,
     txType,
     memo: rawMemo,
-    depositSignature
+    depositSignature,
   })
   return { data, commitIndex }
 }
