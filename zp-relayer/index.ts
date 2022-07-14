@@ -5,15 +5,8 @@ import express from 'express'
 import router from './router'
 import { logger } from './services/appLogger'
 import { createLoggerMiddleware } from './services/loggerMiddleware'
-import { createPoolTxWorker } from './poolTxWorker'
-import { createSentTxWorker } from './sentTxWorker'
 import { config } from './config/config'
-import { pool } from './pool'
-
-pool.init().then(async () => {
-  ;(await createPoolTxWorker()).run()
-  ;(await createSentTxWorker()).run()
-})
+import { init } from './init'
 
 const { TX_PROOFS_DIR } = process.env as Record<PropertyKey, string>
 
@@ -30,4 +23,6 @@ app.use(createLoggerMiddleware('zp.log'))
 
 app.use(router)
 
-app.listen(config.port, () => logger.info(`Started relayer on port ${config.port}`))
+init().then(() => {
+  app.listen(config.port, () => logger.info(`Started relayer on port ${config.port}`))
+})

@@ -1,20 +1,27 @@
-import { Job, Queue, Worker } from 'bullmq'
+import { Queue, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
-import { poolTxQueue } from './services/poolTxQueue'
-import { SENT_TX_QUEUE_NAME } from './utils/constants'
-import { RelayerKeys, updateField, readNonce } from './utils/redisFields'
+import { SENT_TX_QUEUE_NAME, TX_CHECK_DELAY } from './utils/constants'
 import { pool } from './pool'
 import { SentTxPayload, sentTxQueue } from './services/sentTxQueue'
 import { redis } from './services/redisClient'
+import type { GasPrice, EstimationType, GasPriceValue } from './services/GasPrice'
+import type { TransactionConfig } from 'web3-core'
 
 const token = 'RELAYER'
-const MAX_SENT_LIMIT = 10
 
 const WORKER_OPTIONS = {
   autorun: false,
   connection: redis,
   concurrency: 1,
+}
+
+function updateTxGasPrice(txConfig: TransactionConfig, newGasPrice: GasPriceValue) {
+  const newTxConfig = {
+    ...txConfig,
+    ...newGasPrice,
+  }
+  return newTxConfig
 }
 
 async function collectBatch<T>(queue: Queue<T>) {
@@ -36,7 +43,7 @@ async function collectBatch<T>(queue: Queue<T>) {
   return jobs
 }
 
-export async function createSentTxWorker() {
+export async function createSentTxWorker<T extends EstimationType>(gasPrice: GasPrice<T>) {
   const sentTxWorker = new Worker<SentTxPayload>(
     SENT_TX_QUEUE_NAME,
     async job => {
@@ -75,19 +82,24 @@ export async function createSentTxWorker() {
           logger.info(`Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`)
         }
       } else {
-        // Not mined
-        logger.error('Unsupported')
-        // TODO:
-        // Maybe increase gasPrice and need to reschedule all other queue jobs
-        // to maintain correct ordering
+        const txConfig = job.data.txConfig
 
-        // const txConfig = job.data.txConfig
+        const oldGasPrice = txConfig.gasPrice
+        const newGasPrice = gasPrice.getPrice()
 
-        // const oldGasPrice = txConfig.gasPrice
-        // const newGasPrice
-        // // Update gasPrice
-        // txConfig.gasPrice =
-        // await sentTxQueue.add(txHash, job.data)
+        logger.warn('Tx unmined; updating gasPrice: %o -> %o', oldGasPrice, newGasPrice)
+
+        const newTxConfig = updateTxGasPrice(txConfig, newGasPrice)
+
+        const newJobData = {
+          ...job.data,
+          txConfig: newTxConfig,
+        }
+
+        await sentTxQueue.add(txHash, newJobData, {
+          priority: txConfig.nonce,
+          delay: TX_CHECK_DELAY,
+        })
       }
     },
     WORKER_OPTIONS

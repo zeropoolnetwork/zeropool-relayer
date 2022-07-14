@@ -43,20 +43,12 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
   const tokenAmountWithFee = tokenAmount.add(txData.fee)
   let isValid = false
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-    isValid =
-      tokenAmountWithFee.gte(ZERO) &&
-      energyAmount.eq(ZERO) &&
-      msgValue.eq(ZERO)
+    isValid = tokenAmountWithFee.gte(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
   } else if (txType === TxType.TRANSFER) {
-    isValid =
-      tokenAmountWithFee.eq(ZERO) &&
-      energyAmount.eq(ZERO) &&
-      msgValue.eq(ZERO)
+    isValid = tokenAmountWithFee.eq(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
   } else if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
-    isValid =
-      tokenAmountWithFee.lte(ZERO) &&
-      energyAmount.lte(ZERO)
+    isValid = tokenAmountWithFee.lte(ZERO) && energyAmount.lte(ZERO)
     isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
   return isValid
@@ -110,18 +102,8 @@ interface ValidateTx {
   rawMemo: string
 }
 
-<<<<<<< HEAD
-export async function validateTx(
-  { txType, txProof, rawMemo }: ValidateTx
-) {
-  await checkAssertion(
-    () => checkNullifier(txProof.inputs[1]),
-    `Doublespend detected`
-  )
-=======
-export async function validateTx({ txType, txProof, rawMemo }: ValidateTx, maxPoolIndex: number) {
+export async function validateTx({ txType, txProof, rawMemo }: ValidateTx) {
   await checkAssertion(() => checkNullifier(txProof.inputs[1]), `Doublespend detected`)
->>>>>>> ac1438b (Add prettier)
 
   const buf = Buffer.from(rawMemo, 'hex')
   const txData = getTxData(buf, txType)
@@ -142,21 +124,8 @@ export async function validateTx({ txType, txProof, rawMemo }: ValidateTx, maxPo
 
   const delta = parseDelta(txProof.inputs[3])
 
-<<<<<<< HEAD
-  await checkAssertion(
-    () => checkTxSpecificFields(
-      txType,
-      delta.tokenAmount,
-      delta.energyAmount,
-      txData,
-      toBN('0')
-    ),
-=======
-  await checkAssertion(() => checkTransferIndex(toBN(maxPoolIndex), delta.transferIndex), `Incorrect transfer index`)
-
   await checkAssertion(
     () => checkTxSpecificFields(txType, delta.tokenAmount, delta.energyAmount, txData, toBN('0')),
->>>>>>> ac1438b (Add prettier)
     `Tx specific fields are incorrect`
   )
 }

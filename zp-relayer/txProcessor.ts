@@ -65,13 +65,7 @@ function buildTxData(txData: TxData) {
 }
 
 export async function processTx(id: string, tx: TxPayload, pool: Pool) {
-  const {
-    amount,
-    txProof,
-    txType,
-    rawMemo,
-    depositSignature,
-  } = tx
+  const { amount, txProof, txType, rawMemo, depositSignature } = tx
 
   const logPrefix = `Job ${id}:`
 

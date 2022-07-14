@@ -24,3 +24,4 @@ zp-relayer/poolTxs.db
 README.md
 *.yml
 **/lib/
+**/build/

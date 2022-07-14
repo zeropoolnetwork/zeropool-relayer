@@ -29,7 +29,7 @@ const txProof = (() => {
 
 async function sendTransactions(req: Request, res: Response, next: NextFunction) {
   console.log(req.body)
-  const rawTxs = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
+  const rawTxs = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
   try {
     const txs = rawTxs.map((tx: any) => {
       const { proof, memo, txType, depositSignature } = tx
@@ -37,7 +37,7 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
         txProof: proof,
         rawMemo: memo,
         txType,
-        depositSignature
+        depositSignature,
       }
     })
     const jobId = await pool.transact(txs)
@@ -48,7 +48,7 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 }
 
 async function sendTransaction(req: Request, res: Response, next: NextFunction) {
-  const { proof, memo, txType, depositSignature } = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
+  const { proof, memo, txType, depositSignature } = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
   try {
     const tx = [{ txProof: proof, rawMemo: memo, txType, depositSignature }]
     const jobId = await pool.transact(tx)
@@ -155,7 +155,7 @@ function relayerInfo(req: Request, res: Response) {
 
 function getFee(req: Request, res: Response) {
   res.json({
-    fee: config.relayerFee
+    fee: config.relayerFee,
   })
 }
 

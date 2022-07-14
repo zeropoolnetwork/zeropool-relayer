@@ -16,6 +16,10 @@
   "scripts": {
     "initialize": "yarn install --unsafe-perm --frozen-lockfile",
     "build:relayer": "yarn workspace zp-relayer run build",
-    "build:memo": "yarn workspace zp-memo-parser run build"
+    "build:memo": "yarn workspace zp-memo-parser run build",
+    "prettier": "npx prettier --write ."
+  },
+  "resolutions": {
+    "**/@mycrypto/eth-scan": "3.5.3"
   }
 }

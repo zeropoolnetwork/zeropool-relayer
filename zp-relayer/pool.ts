@@ -8,13 +8,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { getChainId, getEvents, getTransaction } from './utils/web3'
-import {
-  Helpers,
-  Params,
-  Proof,
-  SnarkProof,
-  VK,
-} from 'libzkbob-rs-node'
+import { Helpers, Params, Proof, SnarkProof, VK } from 'libzkbob-rs-node'
 import { parseDelta, validateTx } from './validation'
 import { PoolState } from './state'
 
@@ -104,8 +98,6 @@ class Pool {
     for (let i = 0; i < numTxs; i++) {
       missedIndices[i] = localIndex + (i + 1) * OUTPLUSONE
     }
-
-    console.log('MISSED INDICES', missedIndices)
 
     const events = await getEvents(this.PoolInstance, 'Message', {
       fromBlock,

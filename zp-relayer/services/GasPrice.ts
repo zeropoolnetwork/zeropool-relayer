@@ -1,43 +1,44 @@
 import type Web3 from 'web3'
-import type { ProviderLike } from '@mycrypto/eth-scan'
 import { toBN, toWei } from 'web3-utils'
 import { config } from '../config/config'
 import { setIntervalAndRun } from '../utils/helpers'
 import { estimateFees } from '@mycrypto/gas-estimation'
 import { GasPriceOracle } from 'gas-price-oracle'
 import type { GasPriceKey } from 'gas-price-oracle/lib/types'
+import { logger } from './appLogger'
 
 // GasPrice fields
-interface LegacyGasOptions {
+interface LegacyGasPrice {
   gasPrice: string
 }
-interface EIP1559GasOptions {
+interface EIP1559GasPrice {
   maxFeePerGas: string
   maxPriorityFeePerGas: string
 }
-type GasPriceOptions = LegacyGasOptions | EIP1559GasOptions
+export type GasPriceValue = LegacyGasPrice | EIP1559GasPrice
 
-// Estimation types
 type EstimationEIP1559 = 'eip1559-gas-estimation'
 type EstimationOracle = 'gas-price-oracle'
 type EstimationWeb3 = 'web3'
-type EstimationType = EstimationEIP1559 | EstimationOracle | EstimationWeb3
+export type EstimationType = EstimationEIP1559 | EstimationOracle | EstimationWeb3
 
 type EstimationOracleOptions = { speedType: GasPriceKey; factor: number }
 type EstimationOptions<ET extends EstimationType> = ET extends EstimationOracle ? EstimationOracleOptions : {}
 
-type FetchFunc<ET extends EstimationType> = (_: EstimationOptions<ET>) => Promise<GasPriceOptions>
+type FetchFunc<ET extends EstimationType> = (_: EstimationOptions<ET>) => Promise<GasPriceValue>
 
-class GasPrice<ET extends EstimationType> {
-  fetchGasPriceInterval: NodeJS.Timeout | null = null
-  cachedGasPriceOptions: GasPriceOptions
-  updateInterval: number
-  fetchGasPrice: FetchFunc<ET>
-  options: EstimationOptions<ET>
-  web3: Web3
+export class GasPrice<ET extends EstimationType> {
+  private fetchGasPriceInterval: NodeJS.Timeout | null = null
+  private cachedGasPrice: GasPriceValue
+  private updateInterval: number
+  private fetchGasPrice: FetchFunc<ET>
+  private options: EstimationOptions<ET>
+  private web3: Web3
 
-  constructor(web3: Web3, estimationType: ET, options: EstimationOptions<ET>, updateInterval: number) {
-    this.cachedGasPriceOptions = { gasPrice: config.gasPrice }
+  static defaultGasPrice = { gasPrice: config.gasPrice }
+
+  constructor(web3: Web3, updateInterval: number, estimationType: ET, options: EstimationOptions<ET>) {
+    this.cachedGasPrice = GasPrice.defaultGasPrice
     this.updateInterval = updateInterval
     this.web3 = web3
     this.fetchGasPrice = this.getFetchFunc(estimationType)
@@ -47,11 +48,19 @@ class GasPrice<ET extends EstimationType> {
   async start() {
     if (this.fetchGasPriceInterval) clearInterval(this.fetchGasPriceInterval)
 
-    this.cachedGasPriceOptions = { gasPrice: config.gasPrice }
-
     this.fetchGasPriceInterval = await setIntervalAndRun(async () => {
-      this.cachedGasPriceOptions = await this.fetchGasPrice(this.options)
+      try {
+        this.cachedGasPrice = await this.fetchGasPrice(this.options)
+        logger.info('Updated gasPrice: %o', this.cachedGasPrice)
+      } catch (e) {
+        logger.warn('Failed to fetch gasPrice %o; using default value', e)
+        this.cachedGasPrice = GasPrice.defaultGasPrice
+      }
     }, this.updateInterval)
+  }
+
+  getPrice() {
+    return this.cachedGasPrice
   }
 
   private getFetchFunc(estimationType: ET): FetchFunc<ET> {
@@ -64,7 +73,8 @@ class GasPrice<ET extends EstimationType> {
   }
 
   private fetchGasPriceEIP1559: FetchFunc<EstimationEIP1559> = async () => {
-    const options = await estimateFees(this.web3 as ProviderLike)
+    // @ts-ignore
+    const options = await estimateFees(this.web3)
     const res = {
       maxFeePerGas: options.maxFeePerGas.toString(10),
       maxPriorityFeePerGas: options.maxPriorityFeePerGas.toString(10),
