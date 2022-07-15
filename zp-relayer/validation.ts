@@ -106,11 +106,11 @@ interface ValidateTx {
   txType: TxType
   txProof: Proof
   rawMemo: string
+  delta: Delta
 }
 
 export async function validateTx(
-  { txType, txProof, rawMemo }: ValidateTx,
-  maxPoolIndex: number
+  { txType, txProof, rawMemo, delta }: ValidateTx
 ) {
   await checkAssertion(
     () => checkNullifier(txProof.inputs[1]),
@@ -144,13 +144,6 @@ export async function validateTx(
   await checkAssertion(
     () => checkTxProof(txProof),
     `Incorrect transfer proof`
-  )
-
-  const delta = parseDelta(txProof.inputs[3])
-
-  await checkAssertion(
-    () => checkTransferIndex(toBN(maxPoolIndex), delta.transferIndex),
-    `Incorrect transfer index`
   )
 
   await checkAssertion(
