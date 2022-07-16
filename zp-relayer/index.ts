@@ -33,7 +33,8 @@ const router = express.Router()
 // Used only for testing as proving on client is now slow
 router.post('/proof_tx', endpoints.txProof)
 
-router.post('/transaction', endpoints.transaction)
+router.post('/sendTransaction', endpoints.sendTransaction)
+router.post('/sendTransactions', endpoints.sendTransactions)
 router.get('/transactions', endpoints.getTransactions)
 router.get('/transactions/v2', endpoints.getTransactionsV2)
 router.get('/merkle/root/:index?', endpoints.merkleRoot)

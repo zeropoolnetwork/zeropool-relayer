@@ -39,21 +39,22 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
     JSON.stringify(txData),
     msgValue.toString()
   )
+  const tokenAmountWithFee = tokenAmount.add(txData.fee)
   let isValid = false
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
     isValid =
-      tokenAmount.gte(ZERO) &&
+      tokenAmountWithFee.gte(ZERO) &&
       energyAmount.eq(ZERO) &&
       msgValue.eq(ZERO)
   } else if (txType === TxType.TRANSFER) {
     isValid =
-      tokenAmount.eq(ZERO) &&
+      tokenAmountWithFee.eq(ZERO) &&
       energyAmount.eq(ZERO) &&
       msgValue.eq(ZERO)
   } else if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
     isValid =
-      tokenAmount.lte(ZERO) &&
+      tokenAmountWithFee.lte(ZERO) &&
       energyAmount.lte(ZERO)
     isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
@@ -106,11 +107,10 @@ interface ValidateTx {
   txType: TxType
   txProof: Proof
   rawMemo: string
-  delta: Delta
 }
 
 export async function validateTx(
-  { txType, txProof, rawMemo, delta }: ValidateTx
+  { txType, txProof, rawMemo }: ValidateTx
 ) {
   await checkAssertion(
     () => checkNullifier(txProof.inputs[1]),
@@ -145,6 +145,8 @@ export async function validateTx(
     () => checkTxProof(txProof),
     `Incorrect transfer proof`
   )
+
+  const delta = parseDelta(txProof.inputs[3])
 
   await checkAssertion(
     () => checkTxSpecificFields(

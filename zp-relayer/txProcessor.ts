@@ -67,17 +67,16 @@ function buildTxData(txData: TxData) {
   return data.join('')
 }
 
-export async function processTx(job: Job<TxPayload>, pool: Pool) {
+export async function processTx(id: string, tx: TxPayload, pool: Pool) {
   const {
     amount,
     txProof,
     txType,
     rawMemo,
     depositSignature,
-  } = job.data
-  const jobId = job.id
+  } = tx
 
-  const logPrefix = `Job ${jobId}:`
+  const logPrefix = `Job ${id}:`
 
   logger.info(`${logPrefix} Recieved ${txType} tx with ${amount} native amount`)
 
