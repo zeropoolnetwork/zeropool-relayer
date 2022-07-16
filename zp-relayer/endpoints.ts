@@ -28,10 +28,31 @@ const txProof = (() => {
   }
 })()
 
-async function transaction(req: Request, res: Response, next: NextFunction) {
+async function sendTransactions(req: Request, res: Response, next: NextFunction) {
+  console.log(req.body)
+  const rawTxs = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
+  try {
+    const txs = rawTxs.map((tx: any) => {
+      const {proof, memo, txType, depositSignature} = tx
+      return {
+        txProof: proof,
+        rawMemo: memo,
+        txType,
+        depositSignature
+      }
+    })
+    const jobId = await pool.transact(txs)
+    res.json({ jobId })
+  } catch (err) {
+    next(err)
+  }
+}
+
+async function sendTransaction(req: Request, res: Response, next: NextFunction) {
   const { proof, memo, txType, depositSignature } = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
   try {
-    const jobId = await pool.transact(proof, memo, txType, depositSignature)
+    const tx = [{ txProof: proof, rawMemo: memo, txType, depositSignature }]
+    const jobId = await pool.transact(tx)
     res.json({ jobId })
   } catch (err) {
     next(err)
@@ -131,7 +152,8 @@ function relayerInfo(req: Request, res: Response) {
 
 export default {
   txProof,
-  transaction,
+  sendTransaction,
+  sendTransactions,
   merkleRoot,
   getTransactions,
   getTransactionsV2,

@@ -28,73 +28,79 @@ const WORKER_OPTIONS = {
 
 export async function createPoolTxWorker() {
   await updateField(RelayerKeys.NONCE, await readNonce(true))
-  const poolTxWorker = new Worker<TxPayload>(TX_QUEUE_NAME, async job => {
+  const poolTxWorker = new Worker<TxPayload[]>(TX_QUEUE_NAME, async job => {
+    const txs = job.data
+
     const logPrefix = `POOL WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
+    logger.info('Recieved %s txs', txs.length)
 
-    const { gas, amount, rawMemo, txType, txProof } = job.data
+    const txHashes = []
+    for (const tx of txs) {
+      const { gas, amount, rawMemo, txType, txProof } = tx
 
-    const delta = parseDelta(txProof.inputs[3])
-    await checkAssertion(
-      () => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex),
-      `Incorrect transfer index`
-    )
-
-    const { data, commitIndex } = await processTx(job, pool)
-    const outCommit = txProof.inputs[2]
-
-    const nonce = await incrNonce()
-    logger.info(`${logPrefix} nonce: ${nonce}`)
-
-    let txHash: string
-    try {
-      txHash = await signAndSend(
-        {
-          data,
-          nonce,
-          gasPrice: GAS_PRICE,
-          value: toWei(toBN(amount)),
-          gas,
-          to: config.poolAddress,
-          chainId: pool.chainId,
-        },
-        RELAYER_ADDRESS_PRIVATE_KEY,
-        web3
+      const delta = parseDelta(txProof.inputs[3])
+      await checkAssertion(
+        () => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex),
+        `Incorrect transfer index`
       )
-    } catch (e) {
-      logger.error(`${logPrefix} Send TX failed: ${e}`)
-      throw e
+
+      const { data, commitIndex } = await processTx(job.id as string, tx, pool)
+      const outCommit = txProof.inputs[2]
+
+      const nonce = await incrNonce()
+      logger.info(`${logPrefix} nonce: ${nonce}`)
+
+      try {
+        const txHash = await signAndSend(
+          {
+            data,
+            nonce,
+            gasPrice: GAS_PRICE,
+            value: toWei(toBN(amount)),
+            gas,
+            to: config.poolAddress,
+            chainId: pool.chainId,
+          },
+          RELAYER_ADDRESS_PRIVATE_KEY,
+          web3
+        )
+        logger.debug(`${logPrefix} TX hash ${txHash}`)
+
+        await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
+
+        const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
+        const txData = numToHex(toBN(outCommit))
+          .concat(txHash.slice(2))
+          .concat(truncatedMemo)
+
+        pool.optimisticState.updateState(commitIndex, outCommit, txData)
+
+        txHashes.push(txHash)
+
+        await sentTxQueue.add(txHash, {
+          payload: tx,
+          outCommit,
+          commitIndex,
+          txHash,
+          txData,
+          txConfig: {}
+        },
+          {
+            delay: TX_CHECK_DELAY
+          })
+
+        const sentTxNum = await sentTxQueue.count()
+        if (sentTxNum > MAX_SENT_LIMIT) {
+          await poolTxWorker.pause()
+        }
+      } catch (e) {
+        logger.error(`${logPrefix} Send TX failed: ${e}`)
+        throw e
+      }
     }
 
-    logger.debug(`${logPrefix} TX hash ${txHash}`)
-
-    await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
-
-    const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
-    const txData = numToHex(toBN(outCommit))
-      .concat(txHash.slice(2))
-      .concat(truncatedMemo)
-
-    pool.optimisticState.updateState(commitIndex, outCommit, txData)
-
-    await sentTxQueue.add(txHash, {
-      payload: job.data,
-      outCommit,
-      commitIndex,
-      txHash,
-      txData,
-      txConfig: {}
-    },
-      {
-        delay: TX_CHECK_DELAY
-      })
-
-    const sentTxNum = await sentTxQueue.count()
-    if (sentTxNum > MAX_SENT_LIMIT) {
-      await poolTxWorker.pause()
-    }
-
-    return txHash
+    return txHashes
   }, WORKER_OPTIONS)
 
   poolTxWorker.on('error', e => {

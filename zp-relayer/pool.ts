@@ -23,6 +23,13 @@ import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './u
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { OUTPLUSONE } from './utils/constants'
 
+interface PoolTx {
+  txProof: Proof
+  rawMemo: string
+  txType: TxType
+  depositSignature: string | null
+}
+
 class Pool {
   public PoolInstance: Contract
   public treeParams: Params
@@ -53,19 +60,24 @@ class Pool {
     this.isInitialized = true
   }
 
-  async transact(txProof: Proof, rawMemo: string, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
+  async transact(txs: PoolTx[]) {
     // Note: Here we use `maxPoolIndex` from optimistic state
-    await validateTx({ txType, txProof, rawMemo })
+    for (const { txType, txProof, rawMemo } of txs) {
+      await validateTx({ txType, txProof, rawMemo })
+    }
 
-    logger.debug('Adding tx job to queue')
-    const job = await poolTxQueue.add('tx', {
-      amount: '0',
-      gas: config.relayerGasLimit.toString(),
-      txProof,
-      txType,
-      rawMemo,
-      depositSignature,
+    const queueTxs = txs.map(({ txProof, txType, rawMemo, depositSignature }) => {
+      return {
+        amount: '0',
+        gas: config.relayerGasLimit.toString(),
+        txProof,
+        txType,
+        rawMemo,
+        depositSignature,
+      }
     })
+    logger.debug('Adding tx job to queue')
+    const job = await poolTxQueue.add('tx', queueTxs)
     logger.debug(`Added job: ${job.id}`)
     return job.id
   }
