@@ -106,11 +106,10 @@ interface ValidateTx {
   txType: TxType
   txProof: Proof
   rawMemo: string
-  delta: Delta
 }
 
 export async function validateTx(
-  { txType, txProof, rawMemo, delta }: ValidateTx
+  { txType, txProof, rawMemo }: ValidateTx
 ) {
   await checkAssertion(
     () => checkNullifier(txProof.inputs[1]),
@@ -145,6 +144,8 @@ export async function validateTx(
     () => checkTxProof(txProof),
     `Incorrect transfer proof`
   )
+
+  const delta = parseDelta(txProof.inputs[3])
 
   await checkAssertion(
     () => checkTxSpecificFields(

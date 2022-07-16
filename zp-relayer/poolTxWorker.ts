@@ -13,7 +13,7 @@ import { processTx } from './txProcessor'
 import { toWei } from 'web3-utils'
 import { config } from './config/config'
 import { redis } from './services/redisClient'
-import { checkAssertion, checkTransferIndex } from './validation'
+import { checkAssertion, checkTransferIndex, parseDelta } from './validation'
 
 const {
   RELAYER_ADDRESS_PRIVATE_KEY,
@@ -32,8 +32,9 @@ export async function createPoolTxWorker() {
     const logPrefix = `POOL WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
 
-    const { gas, amount, rawMemo, txType, txProof, delta } = job.data
+    const { gas, amount, rawMemo, txType, txProof } = job.data
 
+    const delta = parseDelta(txProof.inputs[3])
     await checkAssertion(
       () => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex),
       `Incorrect transfer index`

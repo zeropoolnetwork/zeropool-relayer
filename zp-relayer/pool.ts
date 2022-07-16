@@ -55,15 +55,13 @@ class Pool {
 
   async transact(txProof: Proof, rawMemo: string, txType: TxType = TxType.TRANSFER, depositSignature: string | null) {
     // Note: Here we use `maxPoolIndex` from optimistic state
-    const delta = parseDelta(txProof.inputs[3])
-    await validateTx({ txType, txProof, rawMemo, delta })
+    await validateTx({ txType, txProof, rawMemo })
 
     logger.debug('Adding tx job to queue')
     const job = await poolTxQueue.add('tx', {
       amount: '0',
       gas: config.relayerGasLimit.toString(),
       txProof,
-      delta,
       txType,
       rawMemo,
       depositSignature,

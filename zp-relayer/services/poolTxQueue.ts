@@ -9,7 +9,6 @@ export interface TxPayload {
   amount: string
   gas: string | number
   txProof: Proof
-  delta: Delta
   txType: TxType
   rawMemo: string
   depositSignature: string | null
