@@ -15,8 +15,6 @@ import { redis } from './services/redisClient'
 import { checkAssertion, checkTransferIndex, parseDelta } from './validation'
 import type { EstimationType, GasPrice } from './services/GasPrice'
 
-const { RELAYER_ADDRESS_PRIVATE_KEY } = process.env as Record<PropertyKey, string>
-
 const WORKER_OPTIONS = {
   autorun: false,
   connection: redis,
@@ -61,7 +59,7 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
           ...gasPriceOptions,
         }
         try {
-          const txHash = await signAndSend(txConfig, RELAYER_ADDRESS_PRIVATE_KEY, web3)
+          const txHash = await signAndSend(txConfig, config.relayerPrivateKey, web3)
           logger.debug(`${logPrefix} TX hash ${txHash}`)
 
           await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)

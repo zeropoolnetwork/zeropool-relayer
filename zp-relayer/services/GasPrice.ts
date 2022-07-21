@@ -35,7 +35,7 @@ export class GasPrice<ET extends EstimationType> {
   private options: EstimationOptions<ET>
   private web3: Web3
 
-  static defaultGasPrice = { gasPrice: config.gasPrice }
+  static defaultGasPrice = { gasPrice: config.gasPriceFallback }
 
   constructor(web3: Web3, updateInterval: number, estimationType: ET, options: EstimationOptions<ET>) {
     this.cachedGasPrice = GasPrice.defaultGasPrice

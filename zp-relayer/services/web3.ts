@@ -1,4 +1,4 @@
 import Web3 from 'web3'
-const { RPC_URL } = process.env as Record<PropertyKey, string>
+import config from '../config'
 
-export const web3 = new Web3(RPC_URL)
+export const web3 = new Web3(config.rpcUrl)

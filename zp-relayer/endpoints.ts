@@ -6,14 +6,16 @@ import { poolTxQueue } from './services/poolTxQueue'
 import config from './config'
 import { proveTx } from './prover'
 
-const { TX_PROOFS_DIR } = process.env as Record<PropertyKey, string>
-
 const txProof = (() => {
   let txProofNum = 0
   return async (req: Request, res: Response) => {
     logger.debug('Proving tx...')
     const { pub, sec } = JSON.parse(req.body)
     if (logger.isDebugEnabled()) {
+      const TX_PROOFS_DIR = 'tx_proofs'
+      if (!fs.existsSync(TX_PROOFS_DIR)) {
+        fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
+      }
       fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
       txProofNum += 1
     }
