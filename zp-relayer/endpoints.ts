@@ -4,6 +4,7 @@ import { Request, Response, NextFunction } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
+import { config } from './config/config'
 
 const {
   TX_PROOFS_DIR,
@@ -33,7 +34,7 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
   const rawTxs = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
   try {
     const txs = rawTxs.map((tx: any) => {
-      const {proof, memo, txType, depositSignature} = tx
+      const { proof, memo, txType, depositSignature } = tx
       return {
         txProof: proof,
         rawMemo: memo,
@@ -150,6 +151,12 @@ function relayerInfo(req: Request, res: Response) {
   })
 }
 
+function getFee(req: Request, res: Response) {
+  res.json({
+    fee: config.relayerFee
+  })
+}
+
 export default {
   txProof,
   sendTransaction,
@@ -159,4 +166,5 @@ export default {
   getTransactionsV2,
   getJob,
   relayerInfo,
+  getFee,
 }
