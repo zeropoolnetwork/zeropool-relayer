@@ -1,29 +1,25 @@
 import fs from 'fs'
-import childProcess from 'child_process'
 import { Request, Response, NextFunction } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import config from './config'
+import { proveTx } from './prover'
 
 const { TX_PROOFS_DIR } = process.env as Record<PropertyKey, string>
 
 const txProof = (() => {
   let txProofNum = 0
-  return (req: Request, res: Response) => {
+  return async (req: Request, res: Response) => {
     logger.debug('Proving tx...')
     const { pub, sec } = JSON.parse(req.body)
     if (logger.isDebugEnabled()) {
       fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
       txProofNum += 1
     }
-
-    const child = childProcess.fork('./prover.js')
-    child.send({ pub, sec })
-    child.on('message', p => {
-      logger.debug('Tx proved')
-      res.json(p)
-    })
+    const proof = await proveTx(pub, sec)
+    logger.debug('Tx proved')
+    res.json(proof)
   }
 })()
 

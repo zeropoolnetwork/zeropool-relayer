@@ -9,7 +9,7 @@ import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { getChainId, getEvents, getTransaction } from './utils/web3'
 import { Helpers, Params, Proof, SnarkProof, VK } from 'libzkbob-rs-node'
-import { parseDelta, validateTx } from './validation'
+import { validateTx } from './validation'
 import { PoolState } from './state'
 
 import { TxType } from 'zp-memo-parser'
