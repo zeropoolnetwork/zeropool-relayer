@@ -1,7 +1,7 @@
 import { logger } from '../services/appLogger'
 import { redis } from '../services/redisClient'
 import { web3 } from '../services/web3'
-import { config } from '../config/config'
+import config from '../config'
 import { getNonce } from './web3'
 import { pool } from '../pool'
 

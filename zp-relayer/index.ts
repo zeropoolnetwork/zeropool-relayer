@@ -5,7 +5,7 @@ import express from 'express'
 import router from './router'
 import { logger } from './services/appLogger'
 import { createLoggerMiddleware } from './services/loggerMiddleware'
-import { config } from './config/config'
+import config from './config'
 import { init } from './init'
 
 const { TX_PROOFS_DIR } = process.env as Record<PropertyKey, string>

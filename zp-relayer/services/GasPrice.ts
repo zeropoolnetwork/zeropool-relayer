@@ -1,6 +1,6 @@
 import type Web3 from 'web3'
 import { toBN, toWei } from 'web3-utils'
-import { config } from '../config/config'
+import config from '../config'
 import { setIntervalAndRun } from '../utils/helpers'
 import { estimateFees } from '@mycrypto/gas-estimation'
 import { GasPriceOracle } from 'gas-price-oracle'

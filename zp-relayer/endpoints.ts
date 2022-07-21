@@ -4,7 +4,7 @@ import { Request, Response, NextFunction } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
-import { config } from './config/config'
+import config from './config'
 
 const { TX_PROOFS_DIR } = process.env as Record<PropertyKey, string>
 

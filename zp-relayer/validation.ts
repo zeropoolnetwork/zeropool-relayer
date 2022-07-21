@@ -3,7 +3,7 @@ import { toBN } from 'web3-utils'
 import { TxType, TxData, WithdrawTxData, PermittableDepositTxData, getTxData } from 'zp-memo-parser'
 import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
-import { config } from './config/config'
+import config from './config'
 import { pool } from './pool'
 
 const ZERO = toBN(0)

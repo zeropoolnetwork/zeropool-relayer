@@ -10,7 +10,7 @@ import { signAndSend } from './tx/signAndSend'
 import { pool } from './pool'
 import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
-import { config } from './config/config'
+import config from './config'
 import { redis } from './services/redisClient'
 import { checkAssertion, checkTransferIndex, parseDelta } from './validation'
 import type { EstimationType, GasPrice } from './services/GasPrice'
@@ -50,7 +50,6 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
         const nonce = await incrNonce()
         logger.info(`${logPrefix} nonce: ${nonce}`)
 
-        let txHash: string
         const gasPriceOptions = gasPrice.getPrice()
         const txConfig = {
           data,
