@@ -1,7 +1,7 @@
 const { Job, Worker, Queue } = require('bullmq')
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 async function processTx(b) {
@@ -17,7 +17,7 @@ async function collectBatch(worker, s) {
 
   const jobs = []
   for (let i = 0; i < s; i++) {
-    const job = await worker.getNextJob(token);
+    const job = await worker.getNextJob(token)
     if (job) {
       jobs.push(job.data)
     } else return jobs
@@ -26,8 +26,7 @@ async function collectBatch(worker, s) {
 }
 
 async function createTxWorker() {
-
-  const myQueue = new Queue('foo');
+  const myQueue = new Queue('foo')
 
   for (let i = 0; i < 8; i++) {
     await myQueue.add('myJobName', i)

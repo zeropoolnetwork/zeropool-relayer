@@ -3,19 +3,13 @@ import BN from 'bn.js'
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
 import { Contract } from 'web3-eth-contract'
-import { config } from './config/config'
+import config from './config'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { getChainId, getEvents, getTransaction } from './utils/web3'
-import {
-  Helpers,
-  Params,
-  Proof,
-  SnarkProof,
-  VK,
-} from 'libzkbob-rs-node'
-import { parseDelta, validateTx } from './validation'
+import { Helpers, Params, Proof, SnarkProof, VK } from 'libzkbob-rs-node'
+import { validateTx } from './validation'
 import { PoolState } from './state'
 
 import { TxType } from 'zp-memo-parser'
@@ -105,13 +99,11 @@ class Pool {
       missedIndices[i] = localIndex + (i + 1) * OUTPLUSONE
     }
 
-    console.log('MISSED INDICES', missedIndices)
-
     const events = await getEvents(this.PoolInstance, 'Message', {
       fromBlock,
       filter: {
-        index: missedIndices
-      }
+        index: missedIndices,
+      },
     })
 
     if (events.length !== missedIndices.length) {

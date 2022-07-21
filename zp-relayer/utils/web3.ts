@@ -17,12 +17,18 @@ export async function getNonce(web3: Web3, address: string) {
 export async function getEvents(contract: Contract, event: string, options: PastEventOptions) {
   try {
     const contractAddress = contract.options.address
-    logger.info(
-      '%o, Getting past events',
-      { contractAddress, event, fromBlock: options.fromBlock, toBlock: options.toBlock }
-    )
+    logger.info('%o, Getting past events', {
+      contractAddress,
+      event,
+      fromBlock: options.fromBlock,
+      toBlock: options.toBlock,
+    })
     const pastEvents = await contract.getPastEvents(event, options)
-    logger.debug('%o, Past events obtained', { contractAddress, event, count: pastEvents.length })
+    logger.debug('%o, Past events obtained', {
+      contractAddress,
+      event,
+      count: pastEvents.length,
+    })
     return pastEvents
   } catch (e) {
     if (e instanceof Error) logger.error(e.message)

@@ -3,7 +3,7 @@ import { toBN } from 'web3-utils'
 import { TxType, TxData, WithdrawTxData, PermittableDepositTxData, getTxData } from 'zp-memo-parser'
 import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
-import { config } from './config/config'
+import config from './config'
 import { pool } from './pool'
 
 const ZERO = toBN(0)
@@ -33,7 +33,8 @@ export function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
 }
 
 export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, txData: TxData, msgValue: BN) {
-  logger.debug('TOKENS %s, ENERGY %s, TX DATA %s, MSG VALUE %s',
+  logger.debug(
+    'TOKENS %s, ENERGY %s, TX DATA %s, MSG VALUE %s',
     tokenAmount.toString(),
     energyAmount.toString(),
     JSON.stringify(txData),
@@ -42,20 +43,12 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
   const tokenAmountWithFee = tokenAmount.add(txData.fee)
   let isValid = false
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-    isValid =
-      tokenAmountWithFee.gte(ZERO) &&
-      energyAmount.eq(ZERO) &&
-      msgValue.eq(ZERO)
+    isValid = tokenAmountWithFee.gte(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
   } else if (txType === TxType.TRANSFER) {
-    isValid =
-      tokenAmountWithFee.eq(ZERO) &&
-      energyAmount.eq(ZERO) &&
-      msgValue.eq(ZERO)
+    isValid = tokenAmountWithFee.eq(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
   } else if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
-    isValid =
-      tokenAmountWithFee.lte(ZERO) &&
-      energyAmount.lte(ZERO)
+    isValid = tokenAmountWithFee.lte(ZERO) && energyAmount.lte(ZERO)
     isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
   return isValid
@@ -109,53 +102,30 @@ interface ValidateTx {
   rawMemo: string
 }
 
-export async function validateTx(
-  { txType, txProof, rawMemo }: ValidateTx
-) {
-  await checkAssertion(
-    () => checkNullifier(txProof.inputs[1]),
-    `Doublespend detected`
-  )
+export async function validateTx({ txType, txProof, rawMemo }: ValidateTx) {
+  await checkAssertion(() => checkNullifier(txProof.inputs[1]), `Doublespend detected`)
 
   const buf = Buffer.from(rawMemo, 'hex')
   const txData = getTxData(buf, txType)
 
-  await checkAssertion(
-    () => checkFee(txData.fee),
-    `Fee too low`
-  )
+  await checkAssertion(() => checkFee(txData.fee), `Fee too low`)
 
   if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
-    await checkAssertion(
-      () => checkNativeAmount(nativeAmount),
-      `Native amount too high`
-    )
+    await checkAssertion(() => checkNativeAmount(nativeAmount), `Native amount too high`)
   }
 
   if (txType === TxType.PERMITTABLE_DEPOSIT) {
     const deadline = (txData as PermittableDepositTxData).deadline
-    await checkAssertion(
-      () => checkDeadline(deadline),
-      `Deadline is expired`
-    )
+    await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
   }
 
-  await checkAssertion(
-    () => checkTxProof(txProof),
-    `Incorrect transfer proof`
-  )
+  await checkAssertion(() => checkTxProof(txProof), `Incorrect transfer proof`)
 
   const delta = parseDelta(txProof.inputs[3])
 
   await checkAssertion(
-    () => checkTxSpecificFields(
-      txType,
-      delta.tokenAmount,
-      delta.energyAmount,
-      txData,
-      toBN('0')
-    ),
+    () => checkTxSpecificFields(txType, delta.tokenAmount, delta.energyAmount, txData, toBN('0')),
     `Tx specific fields are incorrect`
   )
 }

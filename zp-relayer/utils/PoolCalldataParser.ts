@@ -1,13 +1,7 @@
-type Field =
-  'selector' |
-  'nullifier' |
-  'outCommit' |
-  'txType' |
-  'memoSize' |
-  'memo'
+type Field = 'selector' | 'nullifier' | 'outCommit' | 'txType' | 'memoSize' | 'memo'
 
 type FieldMapping = {
-  [key in Field]: { start: number, size: number }
+  [key in Field]: { start: number; size: number }
 }
 
 export class PoolCalldataParser {
@@ -19,12 +13,11 @@ export class PoolCalldataParser {
     memoSize: { start: 642, size: 2 },
     memo: { start: 644, size: 0 },
   }
-  constructor(private calldata: Buffer) { }
+  constructor(private calldata: Buffer) {}
 
   getField(f: Field, defaultSize?: number) {
     let { start, size } = this.fields[f]
     size = defaultSize || size
     return '0x' + this.calldata.slice(start, start + size).toString('hex')
   }
-
 }

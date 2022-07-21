@@ -1,22 +1,19 @@
 import { logger } from '../services/appLogger'
 import { redis } from '../services/redisClient'
 import { web3 } from '../services/web3'
-import { config } from '../config/config'
+import config from '../config'
 import { getNonce } from './web3'
 import { pool } from '../pool'
 
 export enum RelayerKeys {
   TRANSFER_NUM = 'relayer:transferNum',
-  NONCE = `relayer:nonce`
+  NONCE = `relayer:nonce`,
 }
 
 export const readNonce = readFieldBuilder(RelayerKeys.NONCE, () => getNonce(web3, config.relayerAddress))
 export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractIndex())
 
-function readFieldBuilder(
-  key: RelayerKeys,
-  forceUpdateFunc?: Function,
-) {
+function readFieldBuilder(key: RelayerKeys, forceUpdateFunc?: Function) {
   return async (forceUpdate?: boolean) => {
     const update = () => {
       if (!forceUpdateFunc) throw new Error('Force update function not provided')

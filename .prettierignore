@@ -1,0 +1,27 @@
+**/.DS_Store
+
+node_modules
+dist
+build
+
+# Relayer files
+**/*.db
+**/tx_proofs/
+prover.js
+*params.bin
+*_key.json
+
+.env
+
+# Log file
+zp.log
+yarn-error.log
+zp-relayer/optimisticTree.db
+zp-relayer/optimisticTxs.db
+zp-relayer/poolTree.db
+zp-relayer/poolTxs.db
+
+README.md
+*.yml
+**/lib/
+**/build/

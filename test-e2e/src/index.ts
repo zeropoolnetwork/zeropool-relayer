@@ -117,7 +117,7 @@ describe('ZP client', () => {
       // Give 10 tokens
       await token.methods.mint(user3.address, denominator.mul(toBN(10)).toString()).send({ from: minter })
       await token.methods.mint(user4.address, denominator.mul(toBN(10)).toString()).send({ from: minter })
-      
+
       await approve('5', user3.address)
       await approve('4', user4.address)
 
@@ -126,7 +126,7 @@ describe('ZP client', () => {
       const sendTxData2 = await deposit(account2, '4', user4.privateKey)
 
       await Promise.all([sendTx(sendTxData1), sendTx(sendTxData2)])
-      
+
       await sleep(35000)
 
       await syncAccounts([account1, account2])

@@ -1,37 +1,33 @@
 import fs from 'fs'
-import childProcess from 'child_process'
 import { Request, Response, NextFunction } from 'express'
 import { pool } from './pool'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
-import { config } from './config/config'
-
-const {
-  TX_PROOFS_DIR,
-} = process.env as Record<PropertyKey, string>
+import config from './config'
+import { proveTx } from './prover'
 
 const txProof = (() => {
   let txProofNum = 0
-  return (req: Request, res: Response) => {
+  return async (req: Request, res: Response) => {
     logger.debug('Proving tx...')
     const { pub, sec } = JSON.parse(req.body)
     if (logger.isDebugEnabled()) {
+      const TX_PROOFS_DIR = 'tx_proofs'
+      if (!fs.existsSync(TX_PROOFS_DIR)) {
+        fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
+      }
       fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
       txProofNum += 1
     }
-
-    const child = childProcess.fork('./prover.js')
-    child.send({ pub, sec })
-    child.on('message', p => {
-      logger.debug('Tx proved')
-      res.json(p)
-    })
+    const proof = await proveTx(pub, sec)
+    logger.debug('Tx proved')
+    res.json(proof)
   }
 })()
 
 async function sendTransactions(req: Request, res: Response, next: NextFunction) {
   console.log(req.body)
-  const rawTxs = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
+  const rawTxs = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
   try {
     const txs = rawTxs.map((tx: any) => {
       const { proof, memo, txType, depositSignature } = tx
@@ -39,7 +35,7 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
         txProof: proof,
         rawMemo: memo,
         txType,
-        depositSignature
+        depositSignature,
       }
     })
     const jobId = await pool.transact(txs)
@@ -50,7 +46,7 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 }
 
 async function sendTransaction(req: Request, res: Response, next: NextFunction) {
-  const { proof, memo, txType, depositSignature } = typeof (req.body) == "object" ? req.body : JSON.parse(req.body)
+  const { proof, memo, txType, depositSignature } = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
   try {
     const tx = [{ txProof: proof, rawMemo: memo, txType, depositSignature }]
     const jobId = await pool.transact(tx)
@@ -71,16 +67,16 @@ async function merkleRoot(req: Request, res: Response, next: NextFunction) {
 }
 
 async function getTransactions(req: Request, res: Response, next: NextFunction) {
-  const limit = Number(req.query.limit as string || '100')
+  const limit = Number((req.query.limit as string) || '100')
   const isOptimistic = req.query.optimistic === 'true'
   if (isNaN(limit) || limit <= 0) {
-    next(new Error("limit must be a positive number"))
+    next(new Error('limit must be a positive number'))
     return
   }
 
-  const offset = Number(req.query.offset as string || '0')
+  const offset = Number((req.query.offset as string) || '0')
   if (isNaN(offset) || offset < 0) {
-    next(new Error("offset must be a positive number or zero"))
+    next(new Error('offset must be a positive number or zero'))
     return
   }
 
@@ -90,15 +86,15 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
 }
 
 async function getTransactionsV2(req: Request, res: Response, next: NextFunction) {
-  const limit = Number(req.query.limit as string || '100')
+  const limit = Number((req.query.limit as string) || '100')
   if (isNaN(limit) || limit <= 0) {
-    next(new Error("limit must be a positive number"))
+    next(new Error('limit must be a positive number'))
     return
   }
 
-  const offset = Number(req.query.offset as string || '0')
+  const offset = Number((req.query.offset as string) || '0')
   if (isNaN(offset) || offset < 0) {
-    next(new Error("offset must be a positive number or zero"))
+    next(new Error('offset must be a positive number or zero'))
     return
   }
 
@@ -143,17 +139,21 @@ async function getJob(req: Request, res: Response) {
 
 function relayerInfo(req: Request, res: Response) {
   const deltaIndex = pool.state.getNextIndex()
+  const optimisticDeltaIndex = pool.optimisticState.getNextIndex()
   const root = pool.state.getMerkleRoot()
+  const optimisticRoot = pool.optimisticState.getMerkleRoot()
 
   res.json({
     root,
+    optimisticRoot,
     deltaIndex,
+    optimisticDeltaIndex,
   })
 }
 
 function getFee(req: Request, res: Response) {
   res.json({
-    fee: config.relayerFee
+    fee: config.relayerFee,
   })
 }
 

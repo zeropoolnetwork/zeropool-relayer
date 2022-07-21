@@ -6,12 +6,7 @@ import { TxType } from 'zp-memo-parser'
 
 export function toTxType(t: string): TxType {
   t = truncateHexPrefix(t)
-  if (
-    t === TxType.DEPOSIT ||
-    t === TxType.TRANSFER ||
-    t === TxType.WITHDRAWAL ||
-    t === TxType.PERMITTABLE_DEPOSIT
-  ) {
+  if (t === TxType.DEPOSIT || t === TxType.TRANSFER || t === TxType.WITHDRAWAL || t === TxType.PERMITTABLE_DEPOSIT) {
     return t
   } else {
     throw new Error('incorrect tx type')
@@ -51,8 +46,17 @@ export function numToHex(num: BN, pad = 64) {
 }
 
 export function flattenProof(p: SnarkProof): string {
-  return [p.a, p.b.flat(), p.c].flat().map(n => {
-    const hex = numToHex(toBN(n))
-    return hex
-  }).join('')
+  return [p.a, p.b.flat(), p.c]
+    .flat()
+    .map(n => {
+      const hex = numToHex(toBN(n))
+      return hex
+    })
+    .join('')
+}
+
+export async function setIntervalAndRun(f: () => Promise<void> | void, interval: number) {
+  const handler = setInterval(f, interval)
+  await f()
+  return handler
 }

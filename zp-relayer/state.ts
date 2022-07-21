@@ -1,12 +1,6 @@
 import { logger } from './services/appLogger'
 import { OUTPLUSONE } from './utils/constants'
-import {
-  MerkleTree,
-  TxStorage,
-  MerkleProof,
-  Constants,
-  Helpers,
-} from 'libzkbob-rs-node'
+import { MerkleTree, TxStorage, MerkleProof, Constants, Helpers } from 'libzkbob-rs-node'
 
 export class PoolState {
   private name: string
@@ -58,7 +52,7 @@ export class PoolState {
     return {
       pub: treePub,
       sec: treeSec,
-      commitIndex: nextCommitIndex
+      commitIndex: nextCommitIndex,
     }
   }
 
@@ -139,7 +133,7 @@ export class PoolState {
       if (tx) {
         txs[i] = tx.toString('hex')
       } else {
-        break;
+        break
       }
     }
     return { txs, nextOffset }

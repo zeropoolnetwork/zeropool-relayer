@@ -4,8 +4,5 @@
     "rootDir": ".",
     "outDir": "build"
   },
-  "exclude": [
-    "./test",
-    "./build"
-  ]
+  "exclude": ["./test", "./build"]
 }

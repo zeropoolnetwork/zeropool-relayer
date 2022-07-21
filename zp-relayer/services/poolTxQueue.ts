@@ -13,5 +13,5 @@ export interface TxPayload {
   depositSignature: string | null
 }
 export const poolTxQueue = new Queue<TxPayload[], string>(TX_QUEUE_NAME, {
-  connection: redis
+  connection: redis,
 })
