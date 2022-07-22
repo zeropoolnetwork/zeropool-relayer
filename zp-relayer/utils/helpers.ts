@@ -3,6 +3,7 @@ import { numberToHex, padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
 import { SnarkProof } from 'libzkbob-rs-node'
 import { TxType } from 'zp-memo-parser'
+import type { Mutex } from 'async-mutex'
 
 export function toTxType(t: string): TxType {
   t = truncateHexPrefix(t)
@@ -59,4 +60,18 @@ export async function setIntervalAndRun(f: () => Promise<void> | void, interval:
   const handler = setInterval(f, interval)
   await f()
   return handler
+}
+
+export async function withMutex<R>(mutex: Mutex, f: () => Promise<R>): Promise<R> {
+  const release = await mutex.acquire()
+  logger.info('ACQUIRED MUTEX')
+  try {
+    const res = await f()
+    return res
+  } catch (e) {
+    throw e
+  } finally {
+    release()
+    logger.info('RELEASED MUTEX')
+  }
 }

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@mycrypto/gas-estimation": "^1.1.0",
+    "async-mutex": "^0.3.2",
     "bullmq": "1.83.0",
     "cors": "^2.8.5",
     "dotenv": "^10.0.0",
