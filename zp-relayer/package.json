@@ -1,6 +1,6 @@
 {
   "name": "zp-relayer",
-  "version": "1.1.12",
+  "version": "1.1.13",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@mycrypto/gas-estimation": "^1.1.0",
+    "async-mutex": "^0.3.2",
     "bullmq": "1.83.0",
     "cors": "^2.8.5",
     "dotenv": "^10.0.0",
