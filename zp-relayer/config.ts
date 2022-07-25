@@ -22,6 +22,7 @@ const config = {
   logLevel: process.env.RELAYER_LOG_LEVEL || 'debug',
   redisUrl: process.env.RELAYER_REDIS_URL,
   rpcUrl: process.env.RPC_URL as string,
+  sentTxDelay: parseInt(process.env.SENT_TX_DELAY || '30000'),
 }
 
 export default config

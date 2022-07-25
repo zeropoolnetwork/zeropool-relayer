@@ -1,7 +1,7 @@
 import { Job, Queue, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
-import { SENT_TX_QUEUE_NAME, TX_CHECK_DELAY } from './utils/constants'
+import { SENT_TX_QUEUE_NAME } from './utils/constants'
 import { pool } from './pool'
 import { SentTxPayload, sentTxQueue } from './services/sentTxQueue'
 import { redis } from './services/redisClient'
@@ -9,6 +9,7 @@ import type { GasPrice, EstimationType, GasPriceValue } from './services/GasPric
 import type { TransactionConfig } from 'web3-core'
 import type { Mutex } from 'async-mutex'
 import { withMutex } from './utils/helpers'
+import config from './config'
 
 const token = 'RELAYER'
 
@@ -61,6 +62,11 @@ export async function createSentTxWorker<T extends EstimationType>(gasPrice: Gas
     const logPrefix = `SENT WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
 
+    if (await checkMarked(job.id as string)) {
+      logger.info('%s marked as failed, skipping', logPrefix)
+      return null
+    }
+
     const { txHash, txData, commitIndex, outCommit, payload } = job.data
 
     const tx = await web3.eth.getTransactionReceipt(txHash)
@@ -89,7 +95,9 @@ export async function createSentTxWorker<T extends EstimationType>(gasPrice: Gas
         // To do this we need to acquire a lock for each job. Did not find
         // an easy way to do that yet. See 'collectBatch'
         const jobs = await sentTxQueue.getJobs(['delayed', 'waiting'])
-        await markFailed(jobs.map(() => job.id as string))
+        const ids = jobs.map(j => j.id as string)
+        logger.info('%s marking ids %j as failed', logPrefix, ids)
+        await markFailed(ids)
 
         logger.info('Rollback optimistic state...')
         pool.optimisticState.rollbackTo(pool.state)
@@ -114,19 +122,13 @@ export async function createSentTxWorker<T extends EstimationType>(gasPrice: Gas
 
       await sentTxQueue.add(txHash, newJobData, {
         priority: txConfig.nonce,
-        delay: TX_CHECK_DELAY,
+        delay: config.sentTxDelay,
       })
     }
   }
   const sentTxWorker = new Worker<SentTxPayload>(
     SENT_TX_QUEUE_NAME,
-    job =>
-      withMutex(mutex, async () => {
-        if (await checkMarked(job.id as string)) {
-          return null
-        }
-        return sentTxWorkerProcessor(job)
-      }),
+    job => withMutex(mutex, () => sentTxWorkerProcessor(job)),
     WORKER_OPTIONS
   )
 

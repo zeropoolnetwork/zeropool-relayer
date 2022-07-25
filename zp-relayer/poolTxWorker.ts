@@ -3,7 +3,7 @@ import { Job, Worker } from 'bullmq'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { TxPayload } from './services/poolTxQueue'
-import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT, TX_CHECK_DELAY } from './utils/constants'
+import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT } from './utils/constants'
 import { readNonce, updateField, RelayerKeys, incrNonce } from './utils/redisFields'
 import { numToHex, truncateMemoTxPrefix, withMutex } from './utils/helpers'
 import { signAndSend } from './tx/signAndSend'
@@ -80,7 +80,7 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
             txConfig: {},
           },
           {
-            delay: TX_CHECK_DELAY,
+            delay: config.sentTxDelay,
             priority: txConfig.nonce,
           }
         )
