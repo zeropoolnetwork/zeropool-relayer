@@ -138,7 +138,7 @@ async function proofTx(mergeTx: any, fake: boolean) {
 }
 
 export async function sendTx(sendTxData: SendTx) {
-  return await postData(`${relayerUrl}/sendTransactions`, sendTxData).then(data => {
+  return await postData(`${relayerUrl}/sendTransaction`, sendTxData).then(data => {
     console.log(data)
   })
 }

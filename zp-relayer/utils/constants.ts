@@ -5,7 +5,6 @@ const constants = {
   TX_QUEUE_NAME: 'tx',
   SENT_TX_QUEUE_NAME: 'sent',
   MAX_SENT_LIMIT: 10,
-  TX_CHECK_DELAY: 30000,
   OUTPLUSONE: Constants.OUT + 1,
   TRANSFER_INDEX_SIZE: 12,
   ENERGY_SIZE: 28,

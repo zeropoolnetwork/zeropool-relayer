@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   anvil:
-    image: ghcr.io/foundry-rs/foundry:nightly-123ad0a427dc938a0a911eae3332de6576370a51
+    image: ghcr.io/foundry-rs/foundry:nightly-64fe4acc97e6d76551cea7598c201f05ecd65639
     ports:
       - 8545:8545
     entrypoint: >
@@ -22,7 +22,7 @@ services:
   contracts:
     image: lok52/zp-contracts:latest
     environment:
-      - NETWORK=docker_ganache
+      - NETWORK=docker_anvil
   redis:
     container_name: redis
     command: [redis-server, --port, '6379', --appendonly, 'yes']

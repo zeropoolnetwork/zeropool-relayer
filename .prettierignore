@@ -21,7 +21,7 @@ zp-relayer/optimisticTxs.db
 zp-relayer/poolTree.db
 zp-relayer/poolTxs.db
 
-README.md
+*.md
 *.yml
 **/lib/
 **/build/
