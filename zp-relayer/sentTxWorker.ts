@@ -22,7 +22,9 @@ const WORKER_OPTIONS = {
 const REVERTED_SET = 'reverted'
 
 async function markFailed(ids: string[]) {
-  await redis.sadd(REVERTED_SET, ids)
+  if (ids.length !== 0) {
+    await redis.sadd(REVERTED_SET, ids)
+  }
 }
 
 async function checkMarked(id: string) {
