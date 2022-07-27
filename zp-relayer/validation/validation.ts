@@ -1,4 +1,4 @@
-import Ajv, { JSONSchemaType, Schema, ValidateFunction } from 'ajv'
+import Ajv, { JSONSchemaType, ValidateFunction } from 'ajv'
 import { Proof, SnarkProof } from 'libzkbob-rs-node'
 import type { PoolTx } from '../pool'
 import { TxType } from 'zp-memo-parser'

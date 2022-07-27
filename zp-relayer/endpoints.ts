@@ -9,31 +9,36 @@ import { checkSendTransactionErrors, checkSendTransactionsErrors } from './valid
 
 const txProof = (() => {
   let txProofNum = 0
-  return async (req: Request, res: Response) => {
-    logger.debug('Proving tx...')
-    const { pub, sec } = JSON.parse(req.body)
-    if (logger.isDebugEnabled()) {
-      const TX_PROOFS_DIR = 'tx_proofs'
-      if (!fs.existsSync(TX_PROOFS_DIR)) {
-        fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      logger.debug('Proving tx...')
+      const { pub, sec } = req.body
+      if (logger.isDebugEnabled()) {
+        const TX_PROOFS_DIR = 'tx_proofs'
+        if (!fs.existsSync(TX_PROOFS_DIR)) {
+          fs.mkdirSync(TX_PROOFS_DIR, { recursive: true })
+        }
+        fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
+        txProofNum += 1
       }
-      fs.writeFileSync(`${TX_PROOFS_DIR}/object${txProofNum}.json`, JSON.stringify([pub, sec], null, 2))
-      txProofNum += 1
+      const proof = await proveTx(pub, sec)
+      logger.debug('Tx proved')
+      res.json(proof)
+    } catch (err) {
+      next(err)
     }
-    const proof = await proveTx(pub, sec)
-    logger.debug('Tx proved')
-    res.json(proof)
   }
 })()
 
 async function sendTransactions(req: Request, res: Response, next: NextFunction) {
-  const errors = checkSendTransactionsErrors(req.body)
+  const rawTxs = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
+
+  const errors = checkSendTransactionsErrors(rawTxs)
   if (errors) {
     console.log('Request errors:', errors)
     return res.status(400).json({ errors })
   }
 
-  const rawTxs = req.body
   try {
     const txs = rawTxs.map((tx: any) => {
       const { proof, memo, txType, depositSignature } = tx
@@ -52,13 +57,15 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 }
 
 async function sendTransaction(req: Request, res: Response, next: NextFunction) {
-  const errors = checkSendTransactionErrors(req.body)
+  const rawTx = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
+
+  const errors = checkSendTransactionErrors(rawTx)
   if (errors) {
     console.log('Request errors:', errors)
     return res.status(400).json({ errors })
   }
 
-  const { proof, memo, txType, depositSignature } = req.body
+  const { proof, memo, txType, depositSignature } = rawTx
   try {
     const tx = [{ proof, memo, txType, depositSignature }]
     const jobId = await pool.transact(tx)
@@ -135,12 +142,14 @@ async function getJob(req: Request, res: Response) {
   if (job) {
     const state = await job.getState()
     const txHash = job.returnvalue
+    const failedReason = job.failedReason
     const createdOn = job.timestamp
     const finishedOn = job.finishedOn
 
     res.json({
       state,
       txHash,
+      failedReason,
       createdOn,
       finishedOn,
     })
