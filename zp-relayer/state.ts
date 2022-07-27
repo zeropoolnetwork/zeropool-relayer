@@ -1,16 +1,17 @@
 import { logger } from './services/appLogger'
 import { OUTPLUSONE } from './utils/constants'
 import { MerkleTree, TxStorage, MerkleProof, Constants, Helpers } from 'libzkbob-rs-node'
+import { NullifierSet } from './nullifierSet'
 
 export class PoolState {
-  private name: string
   private tree: MerkleTree
   private txs: TxStorage
+  public nullifiers: NullifierSet
 
-  constructor(name: string) {
-    this.name = name
+  constructor(private name: string) {
     this.tree = new MerkleTree(`./${name}Tree.db`)
     this.txs = new TxStorage(`./${name}Txs.db`)
+    this.nullifiers = new NullifierSet(`${name}-nullifiers`)
   }
 
   getVirtualTreeProofInputs(outCommit: string, transferNum?: number) {
@@ -118,7 +119,7 @@ export class PoolState {
     // Rollback merkle tree
     this.tree.rollback(otherStateNextIndex)
 
-    // Clear optimistic txs
+    // Clear txs
     for (let i = otherStateNextIndex; i < stateNextIndex; i += OUTPLUSONE) {
       this.txs.delete(i)
     }

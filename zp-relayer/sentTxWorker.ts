@@ -22,9 +22,8 @@ const WORKER_OPTIONS = {
 const REVERTED_SET = 'reverted'
 
 async function markFailed(ids: string[]) {
-  if (ids.length !== 0) {
-    await redis.sadd(REVERTED_SET, ids)
-  }
+  if (ids.length === 0) return;
+  await redis.sadd(REVERTED_SET, ids)
 }
 
 async function checkMarked(id: string) {
@@ -69,7 +68,7 @@ export async function createSentTxWorker<T extends EstimationType>(gasPrice: Gas
       return null
     }
 
-    const { txHash, txData, commitIndex, outCommit, payload } = job.data
+    const { txHash, txData, commitIndex, outCommit, nullifier, payload } = job.data
 
     const tx = await web3.eth.getTransactionReceipt(txHash)
     if (tx) {
@@ -79,6 +78,12 @@ export async function createSentTxWorker<T extends EstimationType>(gasPrice: Gas
         logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockNumber)
 
         pool.state.updateState(commitIndex, outCommit, txData)
+
+        // Add nullifer to confirmed state and remove from optimistic one
+        logger.info('Adding nullifier %s to PS', nullifier)
+        await pool.state.nullifiers.add([nullifier])
+        logger.info('Removing nullifier %s from OS', nullifier)
+        await pool.optimisticState.nullifiers.remove([nullifier])
 
         const node1 = pool.state.getCommitment(commitIndex)
         const node2 = pool.optimisticState.getCommitment(commitIndex)
@@ -103,6 +108,8 @@ export async function createSentTxWorker<T extends EstimationType>(gasPrice: Gas
 
         logger.info('Rollback optimistic state...')
         pool.optimisticState.rollbackTo(pool.state)
+        logger.info('Clearing optimistic nullifiers...')
+        await pool.optimisticState.nullifiers.clear()
         const root1 = pool.state.getMerkleRoot()
         const root2 = pool.optimisticState.getMerkleRoot()
         logger.info(`Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`)

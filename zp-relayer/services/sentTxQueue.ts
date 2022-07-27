@@ -11,6 +11,7 @@ export interface SentTxPayload {
   txHash: string
   txData: string
   txConfig: TransactionConfig
+  nullifier: string
 }
 
 // Required for delayed jobs processing

@@ -5,6 +5,7 @@ import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
 import config from './config'
 import { pool } from './pool'
+import { NullifierSet } from './nullifierSet'
 
 const ZERO = toBN(0)
 
@@ -23,9 +24,9 @@ export function checkTxProof(txProof: Proof) {
   return pool.verifyProof(txProof.proof, txProof.inputs)
 }
 
-export async function checkNullifier(nullifier: string) {
-  const exists = await pool.PoolInstance.methods.nullifiers(nullifier).call()
-  return toBN(exists).eq(ZERO)
+export async function checkNullifier(nullifier: string, nullifierSet: NullifierSet) {
+  const inSet = await nullifierSet.isInSet(nullifier)
+  return inSet === 0
 }
 
 export function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
@@ -103,8 +104,6 @@ interface ValidateTx {
 }
 
 export async function validateTx({ txType, txProof, rawMemo }: ValidateTx) {
-  await checkAssertion(() => checkNullifier(txProof.inputs[1]), `Doublespend detected`)
-
   const buf = Buffer.from(rawMemo, 'hex')
   const txData = getTxData(buf, txType)
 

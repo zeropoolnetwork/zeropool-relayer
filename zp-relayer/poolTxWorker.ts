@@ -12,7 +12,7 @@ import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
 import config from './config'
 import { redis } from './services/redisClient'
-import { checkAssertion, checkTransferIndex, parseDelta } from './validateTx'
+import { checkAssertion, checkNullifier, checkTransferIndex, parseDelta } from './validateTx'
 import type { EstimationType, GasPrice } from './services/GasPrice'
 import type { Mutex } from 'async-mutex'
 
@@ -34,14 +34,24 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
     for (const tx of txs) {
       const { gas, amount, rawMemo, txType, txProof } = tx
 
+      const nullifier = txProof.inputs[1]
+      const outCommit = txProof.inputs[2]
       const delta = parseDelta(txProof.inputs[3])
+
+      await checkAssertion(
+        () => checkNullifier(nullifier, pool.state.nullifiers),
+        `Doublespend detected in confirmed state`
+      )
+      await checkAssertion(
+        () => checkNullifier(nullifier, pool.optimisticState.nullifiers),
+        `Doublespend detected in optimistic state`
+      )
       await checkAssertion(
         () => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex),
         `Incorrect transfer index`
       )
 
       const { data, commitIndex } = await processTx(job.id as string, tx, pool)
-      const outCommit = txProof.inputs[2]
 
       const nonce = await incrNonce()
       logger.info(`${logPrefix} nonce: ${nonce}`)
@@ -66,6 +76,8 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
         const txData = numToHex(toBN(outCommit)).concat(txHash.slice(2)).concat(truncatedMemo)
 
         pool.optimisticState.updateState(commitIndex, outCommit, txData)
+        logger.info('Adding nullifier %s to OS', nullifier)
+        await pool.optimisticState.nullifiers.add([nullifier])
 
         txHashes.push(txHash)
 
@@ -77,6 +89,7 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
             commitIndex,
             txHash,
             txData,
+            nullifier,
             txConfig: {},
           },
           {

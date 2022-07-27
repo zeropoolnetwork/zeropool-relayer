@@ -123,6 +123,9 @@ class Pool {
 
       const parser = new PoolCalldataParser(calldata)
 
+      const nullifier = parser.getField('nullifier')
+      await this.state.nullifiers.add([nullifier])
+
       const outCommitRaw = parser.getField('outCommit')
       const outCommit = web3.utils.hexToNumberString(outCommitRaw)
 
