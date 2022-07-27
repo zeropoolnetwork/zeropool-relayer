@@ -9,7 +9,7 @@ import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import { getChainId, getEvents, getTransaction } from './utils/web3'
 import { Helpers, Params, Proof, SnarkProof, VK } from 'libzkbob-rs-node'
-import { validateTx } from './validation'
+import { validateTx } from './validateTx'
 import { PoolState } from './state'
 
 import { TxType } from 'zp-memo-parser'
@@ -17,9 +17,9 @@ import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './u
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { OUTPLUSONE } from './utils/constants'
 
-interface PoolTx {
-  txProof: Proof
-  rawMemo: string
+export interface PoolTx {
+  proof: Proof
+  memo: string
   txType: TxType
   depositSignature: string | null
 }
@@ -56,17 +56,17 @@ class Pool {
 
   async transact(txs: PoolTx[]) {
     // Note: Here we use `maxPoolIndex` from optimistic state
-    for (const { txType, txProof, rawMemo } of txs) {
-      await validateTx({ txType, txProof, rawMemo })
+    for (const { txType, proof, memo } of txs) {
+      await validateTx({ txType, txProof: proof, rawMemo: memo })
     }
 
-    const queueTxs = txs.map(({ txProof, txType, rawMemo, depositSignature }) => {
+    const queueTxs = txs.map(({ proof, txType, memo, depositSignature }) => {
       return {
         amount: '0',
         gas: config.relayerGasLimit.toString(),
-        txProof,
+        txProof: proof,
         txType,
-        rawMemo,
+        rawMemo: memo,
         depositSignature,
       }
     })

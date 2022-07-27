@@ -1,4 +1,5 @@
 import express, { NextFunction, Request, Response } from 'express'
+import cors from 'cors'
 import endpoints from './endpoints'
 
 const router = express.Router()
@@ -10,6 +11,10 @@ router.use((err: any, req: Request, res: Response, next: NextFunction) => {
   }
   next()
 })
+
+router.use(cors())
+router.use(express.urlencoded({ extended: true }))
+router.use(express.json())
 
 // Used only for testing as proving on client is now slow
 router.post('/proof_tx', endpoints.txProof)

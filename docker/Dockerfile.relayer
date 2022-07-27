@@ -36,4 +36,5 @@ COPY --from=build /app/zp-relayer/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/zp-memo-parser ./node_modules/zp-memo-parser
 
+ENV NODE_ENV=production
 CMD yarn run start:prod

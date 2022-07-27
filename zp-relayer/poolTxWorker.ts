@@ -12,7 +12,7 @@ import { sentTxQueue } from './services/sentTxQueue'
 import { processTx } from './txProcessor'
 import config from './config'
 import { redis } from './services/redisClient'
-import { checkAssertion, checkTransferIndex, parseDelta } from './validation'
+import { checkAssertion, checkTransferIndex, parseDelta } from './validateTx'
 import type { EstimationType, GasPrice } from './services/GasPrice'
 import type { Mutex } from 'async-mutex'
 

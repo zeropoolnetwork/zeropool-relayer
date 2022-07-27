@@ -5,6 +5,7 @@ import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import config from './config'
 import { proveTx } from './prover'
+import { checkSendTransactionErrors, checkSendTransactionsErrors } from './validation/validation'
 
 const txProof = (() => {
   let txProofNum = 0
@@ -26,8 +27,13 @@ const txProof = (() => {
 })()
 
 async function sendTransactions(req: Request, res: Response, next: NextFunction) {
-  console.log(req.body)
-  const rawTxs = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
+  const errors = checkSendTransactionsErrors(req.body)
+  if (errors) {
+    console.log('Request errors:', errors)
+    return res.status(400).json({ errors })
+  }
+
+  const rawTxs = req.body
   try {
     const txs = rawTxs.map((tx: any) => {
       const { proof, memo, txType, depositSignature } = tx
@@ -46,9 +52,15 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 }
 
 async function sendTransaction(req: Request, res: Response, next: NextFunction) {
-  const { proof, memo, txType, depositSignature } = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
+  const errors = checkSendTransactionErrors(req.body)
+  if (errors) {
+    console.log('Request errors:', errors)
+    return res.status(400).json({ errors })
+  }
+
+  const { proof, memo, txType, depositSignature } = req.body
   try {
-    const tx = [{ txProof: proof, rawMemo: memo, txType, depositSignature }]
+    const tx = [{ proof, memo, txType, depositSignature }]
     const jobId = await pool.transact(tx)
     res.json({ jobId })
   } catch (err) {

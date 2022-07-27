@@ -10,7 +10,7 @@ import { SnarkProof, Proof } from 'libzkbob-rs-node'
 import { TxType } from 'zp-memo-parser'
 import type { Pool } from './pool'
 
-import { Delta, parseDelta } from './validation'
+import { Delta, parseDelta } from './validateTx'
 
 // @ts-ignore
 const PoolInstance = new Contract(PoolAbi as AbiItem[])
