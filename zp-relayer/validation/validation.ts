@@ -53,7 +53,7 @@ const AjvSendTransactionSchema: JSONSchemaType<PoolTx> = {
     },
     depositSignature: { type: 'string', nullable: true },
   },
-  required: ['proof', 'memo', 'txType', 'depositSignature'],
+  required: ['proof', 'memo', 'txType'],
 }
 
 const AjvSendTransactionsSchema: JSONSchemaType<PoolTx[]> = {
