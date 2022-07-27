@@ -11,7 +11,7 @@ router.use(express.text())
 
 router.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (err) {
-    console.error(err)
+    console.error('Request error:', err)
     return res.sendStatus(500)
   }
   next()

@@ -1,6 +1,6 @@
 import fs from 'fs'
 import { Request, Response, NextFunction } from 'express'
-import { pool } from './pool'
+import { pool, PoolTx } from './pool'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import config from './config'
@@ -31,7 +31,7 @@ const txProof = (() => {
 })()
 
 async function sendTransactions(req: Request, res: Response, next: NextFunction) {
-  const rawTxs = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
+  const rawTxs: PoolTx[] = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
 
   const errors = checkSendTransactionsErrors(rawTxs)
   if (errors) {
@@ -43,8 +43,8 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
     const txs = rawTxs.map((tx: any) => {
       const { proof, memo, txType, depositSignature } = tx
       return {
-        txProof: proof,
-        rawMemo: memo,
+        proof,
+        memo,
         txType,
         depositSignature,
       }
@@ -57,7 +57,7 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 }
 
 async function sendTransaction(req: Request, res: Response, next: NextFunction) {
-  const rawTx = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
+  const rawTx: PoolTx = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
 
   const errors = checkSendTransactionErrors(rawTx)
   if (errors) {
