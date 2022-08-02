@@ -3,7 +3,7 @@ import { Proof, SnarkProof } from 'libzkbob-rs-node'
 import type { PoolTx } from '../pool'
 import { TxType } from 'zp-memo-parser'
 
-const ajv = new Ajv({ allErrors: true })
+const ajv = new Ajv({ allErrors: true, coerceTypes: true, useDefaults: true })
 
 const AjvString: JSONSchemaType<string> = { type: 'string' }
 const AjvG1Point: JSONSchemaType<[string, string]> = {
@@ -61,19 +61,69 @@ const AjvSendTransactionsSchema: JSONSchemaType<PoolTx[]> = {
   items: AjvSendTransactionSchema,
 }
 
-const validateSendTransaction = ajv.compile(AjvSendTransactionSchema)
-const validateSendTransactions = ajv.compile(AjvSendTransactionsSchema)
-
-function checkErrors(validate: ValidateFunction, data: any) {
-  validate(data)
-  console.log(validate.errors)
-  if (validate.errors) {
-    return validate.errors.map(e => {
-      return { path: e.instancePath, message: e.message }
-    })
-  }
-  return null
+const AjvGetTransactionsSchema: JSONSchemaType<{
+  limit: number
+  offset: number
+  optimistic: boolean
+}> = {
+  type: 'object',
+  properties: {
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      default: 100,
+    },
+    offset: {
+      type: 'integer',
+      minimum: 0,
+      default: 0,
+    },
+    optimistic: {
+      type: 'boolean',
+      default: false,
+    },
+  },
+  required: [],
 }
 
-export const checkSendTransactionErrors = (data: any) => checkErrors(validateSendTransaction, data)
-export const checkSendTransactionsErrors = (data: any) => checkErrors(validateSendTransactions, data)
+const AjvGetTransactionsV2Schema: JSONSchemaType<{
+  limit: number
+  offset: number
+}> = {
+  type: 'object',
+  properties: {
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      default: 100,
+    },
+    offset: {
+      type: 'integer',
+      minimum: 0,
+      default: 0,
+    },
+  },
+  required: [],
+}
+
+const validateSendTransaction = ajv.compile(AjvSendTransactionSchema)
+const validateSendTransactions = ajv.compile(AjvSendTransactionsSchema)
+const validateGetTransactions = ajv.compile(AjvGetTransactionsSchema)
+const validateGetTransactionsV2 = ajv.compile(AjvGetTransactionsV2Schema)
+
+function checkErrors(validate: ValidateFunction) {
+  return (data: any) => {
+    validate(data)
+    if (validate.errors) {
+      return validate.errors.map(e => {
+        return { path: e.instancePath, message: e.message }
+      })
+    }
+    return null
+  }
+}
+
+export const checkSendTransactionErrors = checkErrors(validateSendTransaction)
+export const checkSendTransactionsErrors = checkErrors(validateSendTransactions)
+export const checkGetTransactions = checkErrors(validateGetTransactions)
+export const checkGetTransactionsV2 = checkErrors(validateGetTransactionsV2)
