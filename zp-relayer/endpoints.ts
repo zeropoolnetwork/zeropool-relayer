@@ -1,11 +1,16 @@
 import fs from 'fs'
 import { Request, Response, NextFunction } from 'express'
-import { pool, PoolTx } from './pool'
+import { pool } from './pool'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
 import config from './config'
 import { proveTx } from './prover'
-import { checkSendTransactionErrors, checkSendTransactionsErrors } from './validation/validation'
+import {
+  checkGetTransactions,
+  checkGetTransactionsV2,
+  checkSendTransactionErrors,
+  checkSendTransactionsErrors,
+} from './validation/validation'
 
 const txProof = (() => {
   let txProofNum = 0
@@ -31,89 +36,67 @@ const txProof = (() => {
 })()
 
 async function sendTransactions(req: Request, res: Response, next: NextFunction) {
-  const rawTxs: PoolTx[] = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
-
-  const errors = checkSendTransactionsErrors(rawTxs)
+  const errors = checkSendTransactionsErrors(req.body)
   if (errors) {
     console.log('Request errors:', errors)
-    return res.status(400).json({ errors })
+    res.status(400).json({ errors })
+    return
   }
 
-  try {
-    const txs = rawTxs.map((tx: any) => {
-      const { proof, memo, txType, depositSignature } = tx
-      return {
-        proof,
-        memo,
-        txType,
-        depositSignature,
-      }
-    })
-    const jobId = await pool.transact(txs)
-    res.json({ jobId })
-  } catch (err) {
-    next(err)
-  }
+  const rawTxs = req.body
+  const txs = rawTxs.map((tx: any) => {
+    const { proof, memo, txType, depositSignature } = tx
+    return {
+      txProof: proof,
+      rawMemo: memo,
+      txType,
+      depositSignature,
+    }
+  })
+  const jobId = await pool.transact(txs)
+  res.json({ jobId })
 }
 
 async function sendTransaction(req: Request, res: Response, next: NextFunction) {
-  const rawTx: PoolTx = typeof req.body == 'object' ? req.body : JSON.parse(req.body)
-
-  const errors = checkSendTransactionErrors(rawTx)
+  const errors = checkSendTransactionErrors(req.body)
   if (errors) {
     console.log('Request errors:', errors)
-    return res.status(400).json({ errors })
+    res.status(400).json({ errors })
+    return
   }
 
-  const { proof, memo, txType, depositSignature } = rawTx
-  try {
-    const tx = [{ proof, memo, txType, depositSignature }]
-    const jobId = await pool.transact(tx)
-    res.json({ jobId })
-  } catch (err) {
-    next(err)
-  }
+  const { proof, memo, txType, depositSignature } = req.body
+  const tx = [{ proof, memo, txType, depositSignature }]
+  const jobId = await pool.transact(tx)
+  res.json({ jobId })
 }
 
 async function merkleRoot(req: Request, res: Response, next: NextFunction) {
   const index = req.params.index
-  try {
-    const root = await pool.getContractMerkleRoot(index)
-    res.json(root)
-  } catch (err) {
-    next(err)
-  }
+  const root = await pool.getContractMerkleRoot(index)
+  res.json(root)
 }
 
 async function getTransactions(req: Request, res: Response, next: NextFunction) {
-  const limit = Number((req.query.limit as string) || '100')
-  const isOptimistic = req.query.optimistic === 'true'
-  if (isNaN(limit) || limit <= 0) {
-    next(new Error('limit must be a positive number'))
+  const errors = checkGetTransactions(req.query)
+  if (errors) {
+    console.log('Request errors:', errors)
+    res.status(400).json({ errors })
     return
   }
 
-  const offset = Number((req.query.offset as string) || '0')
-  if (isNaN(offset) || offset < 0) {
-    next(new Error('offset must be a positive number or zero'))
-    return
-  }
-
-  const state = isOptimistic ? pool.optimisticState : pool.state
-  const { txs } = await state.getTransactions(limit, offset)
+  const state = req.query.optimistic ? pool.optimisticState : pool.state
+  // Types checked in validation stage
+  // @ts-ignore
+  const { txs } = await state.getTransactions(req.query.limit, req.query.offset)
   res.json(txs)
 }
 
 async function getTransactionsV2(req: Request, res: Response, next: NextFunction) {
-  const limit = Number((req.query.limit as string) || '100')
-  if (isNaN(limit) || limit <= 0) {
-    next(new Error('limit must be a positive number'))
-    return
-  }
-
-  const offset = Number((req.query.offset as string) || '0')
-  if (isNaN(offset) || offset < 0) {
-    next(new Error('offset must be a positive number or zero'))
+  const errors = checkGetTransactionsV2(req.query)
+  if (errors) {
+    console.log('Request errors:', errors)
+    res.status(400).json({ errors })
     return
   }
 
@@ -123,6 +106,10 @@ async function getTransactionsV2(req: Request, res: Response, next: NextFunction
     const memo = tx.slice(128)
     return prefix + txHash + outCommit + memo
   }
+
+  // Types checked in validation stage
+  const limit = req.query.limit as unknown as number
+  const offset = req.query.offset as unknown as number
 
   const txs: string[] = []
   const { txs: poolTxs, nextOffset } = await pool.state.getTransactions(limit, offset)
