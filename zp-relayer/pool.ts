@@ -55,7 +55,6 @@ class Pool {
   }
 
   async transact(txs: PoolTx[]) {
-    // Note: Here we use `maxPoolIndex` from optimistic state
     for (const { txType, proof, memo } of txs) {
       await validateTx({ txType, txProof: proof, rawMemo: memo })
     }
@@ -70,7 +69,6 @@ class Pool {
         depositSignature,
       }
     })
-    logger.debug('Adding tx job to queue')
     const job = await poolTxQueue.add('tx', queueTxs)
     logger.debug(`Added job: ${job.id}`)
     return job.id
@@ -124,7 +122,7 @@ class Pool {
       const parser = new PoolCalldataParser(calldata)
 
       const nullifier = parser.getField('nullifier')
-      await this.state.nullifiers.add([nullifier])
+      await this.state.nullifiers.add([web3.utils.hexToNumberString(nullifier)])
 
       const outCommitRaw = parser.getField('outCommit')
       const outCommit = web3.utils.hexToNumberString(outCommitRaw)
@@ -160,7 +158,7 @@ class Pool {
   async getContractMerkleRoot(index: string | number | undefined): Promise<string> {
     if (!index) {
       index = await this.getContractIndex()
-      console.log('CONTRACT INDEX', index)
+      logger.info('CONTRACT INDEX %d', index)
     }
     const root = await this.PoolInstance.methods.roots(index).call()
     return root.toString()
