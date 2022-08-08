@@ -47,8 +47,8 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
   const txs = rawTxs.map((tx: any) => {
     const { proof, memo, txType, depositSignature } = tx
     return {
-      txProof: proof,
-      rawMemo: memo,
+      proof: proof,
+      memo: memo,
       txType,
       depositSignature,
     }
