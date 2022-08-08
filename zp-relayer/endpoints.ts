@@ -38,7 +38,7 @@ const txProof = (() => {
 async function sendTransactions(req: Request, res: Response, next: NextFunction) {
   const errors = checkSendTransactionsErrors(req.body)
   if (errors) {
-    console.log('Request errors:', errors)
+    logger.info('Request errors: %o', errors)
     res.status(400).json({ errors })
     return
   }
@@ -47,8 +47,8 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
   const txs = rawTxs.map((tx: any) => {
     const { proof, memo, txType, depositSignature } = tx
     return {
-      proof: proof,
-      memo: memo,
+      proof,
+      memo,
       txType,
       depositSignature,
     }
@@ -60,7 +60,7 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 async function sendTransaction(req: Request, res: Response, next: NextFunction) {
   const errors = checkSendTransactionErrors(req.body)
   if (errors) {
-    console.log('Request errors:', errors)
+    logger.info('Request errors: %o', errors)
     res.status(400).json({ errors })
     return
   }
@@ -80,7 +80,7 @@ async function merkleRoot(req: Request, res: Response, next: NextFunction) {
 async function getTransactions(req: Request, res: Response, next: NextFunction) {
   const errors = checkGetTransactions(req.query)
   if (errors) {
-    console.log('Request errors:', errors)
+    logger.info('Request errors: %o', errors)
     res.status(400).json({ errors })
     return
   }
@@ -95,7 +95,7 @@ async function getTransactions(req: Request, res: Response, next: NextFunction) 
 async function getTransactionsV2(req: Request, res: Response, next: NextFunction) {
   const errors = checkGetTransactionsV2(req.query)
   if (errors) {
-    console.log('Request errors:', errors)
+    logger.info('Request errors: %o', errors)
     res.status(400).json({ errors })
     return
   }

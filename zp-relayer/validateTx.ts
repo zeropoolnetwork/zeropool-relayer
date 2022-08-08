@@ -92,7 +92,7 @@ export function checkDeadline(deadline: BN) {
 export async function checkAssertion(f: Function, errStr: string) {
   const res = await f()
   if (!res) {
-    logger.error(errStr)
+    logger.error('Assertion error: ', errStr)
     throw new Error(errStr)
   }
 }
