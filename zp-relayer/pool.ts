@@ -55,8 +55,8 @@ class Pool {
   }
 
   async transact(txs: PoolTx[]) {
-    for (const { txType, proof, memo } of txs) {
-      await validateTx({ txType, txProof: proof, rawMemo: memo })
+    for (const tx of txs) {
+      await validateTx(tx)
     }
 
     const queueTxs = txs.map(({ proof, txType, memo, depositSignature }) => {

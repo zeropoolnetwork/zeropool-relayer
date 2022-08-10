@@ -1,7 +1,6 @@
 import Contract from 'web3-eth-contract'
 import PoolAbi from './abi/pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
-import { Job } from 'bullmq'
 import { logger } from './services/appLogger'
 import { TxPayload } from './services/poolTxQueue'
 import { TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE } from './utils/constants'

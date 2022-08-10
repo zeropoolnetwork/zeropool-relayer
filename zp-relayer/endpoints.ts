@@ -161,7 +161,7 @@ function relayerInfo(req: Request, res: Response) {
 
 function getFee(req: Request, res: Response) {
   res.json({
-    fee: config.relayerFee,
+    fee: config.relayerFee.toString(10),
   })
 }
 

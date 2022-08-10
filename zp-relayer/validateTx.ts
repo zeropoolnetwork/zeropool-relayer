@@ -4,7 +4,7 @@ import { TxType, TxData, WithdrawTxData, PermittableDepositTxData, getTxData } f
 import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
 import config from './config'
-import { pool } from './pool'
+import { pool, PoolTx } from './pool'
 import { NullifierSet } from './nullifierSet'
 
 const ZERO = toBN(0)
@@ -14,6 +14,10 @@ export interface Delta {
   energyAmount: BN
   tokenAmount: BN
   poolId: BN
+}
+
+export function checkSize(data: string, size: number) {
+  return data.length === size
 }
 
 export function checkCommitment(treeProof: Proof, txProof: Proof) {
@@ -92,22 +96,18 @@ export function checkDeadline(deadline: BN) {
 export async function checkAssertion(f: Function, errStr: string) {
   const res = await f()
   if (!res) {
-    logger.error('Assertion error: ', errStr)
+    logger.error('Assertion error: %s', errStr)
     throw new Error(errStr)
   }
 }
 
-interface ValidateTx {
-  txType: TxType
-  txProof: Proof
-  rawMemo: string
-}
-
-export async function validateTx({ txType, txProof, rawMemo }: ValidateTx) {
-  const buf = Buffer.from(rawMemo, 'hex')
+export async function validateTx({ txType, proof, memo, depositSignature }: PoolTx) {
+  const buf = Buffer.from(memo, 'hex')
   const txData = getTxData(buf, txType)
 
   await checkAssertion(() => checkFee(txData.fee), `Fee too low`)
+  // Signature should start with `0x`, so size is 2+(64*2)=130
+  await checkAssertion(() => depositSignature === null || checkSize(depositSignature, 130), `Invalid signature`)
 
   if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
@@ -119,9 +119,9 @@ export async function validateTx({ txType, txProof, rawMemo }: ValidateTx) {
     await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
   }
 
-  await checkAssertion(() => checkTxProof(txProof), `Incorrect transfer proof`)
+  await checkAssertion(() => checkTxProof(proof), `Incorrect transfer proof`)
 
-  const delta = parseDelta(txProof.inputs[3])
+  const delta = parseDelta(proof.inputs[3])
 
   await checkAssertion(
     () => checkTxSpecificFields(txType, delta.tokenAmount, delta.energyAmount, txData, toBN('0')),
