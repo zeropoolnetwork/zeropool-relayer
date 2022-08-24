@@ -45,11 +45,10 @@ interface SaltedPermitMessage {
 export async function initializeDomain(web3: Web3) {
   const token = new web3.eth.Contract(TokenAbi as AbiItem[], config.tokenAddress)
   const name = await token.methods.name().call()
-  const version = await token.methods.version().call()
   const chainId = await getChainId(web3)
   domain = {
     name,
-    version,
+    version: '1',
     chainId,
     verifyingContract: config.poolAddress as string,
   }
