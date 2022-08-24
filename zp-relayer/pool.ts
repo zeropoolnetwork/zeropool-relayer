@@ -7,7 +7,7 @@ import config from './config'
 import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './services/poolTxQueue'
-import { getChainId, getEvents, getTransaction } from './utils/web3'
+import { getEvents, getTransaction } from './utils/web3'
 import { Helpers, Params, Proof, SnarkProof, VK } from 'libzkbob-rs-node'
 import { validateTx } from './validateTx'
 import { PoolState } from './state'
@@ -30,7 +30,6 @@ class Pool {
   private txVK: VK
   public state: PoolState
   public optimisticState: PoolState
-  public chainId: number = 0
   public denominator: BN = toBN(1)
   public isInitialized = false
 
@@ -48,7 +47,6 @@ class Pool {
   async init() {
     if (this.isInitialized) return
 
-    this.chainId = await getChainId(web3)
     this.denominator = toBN(await this.PoolInstance.methods.denominator().call())
     await this.syncState()
     this.isInitialized = true

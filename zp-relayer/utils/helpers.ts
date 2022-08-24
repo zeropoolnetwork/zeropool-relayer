@@ -1,9 +1,12 @@
 import BN from 'bn.js'
-import { numberToHex, padLeft, toBN } from 'web3-utils'
+import { padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
 import { SnarkProof } from 'libzkbob-rs-node'
 import { TxType } from 'zp-memo-parser'
 import type { Mutex } from 'async-mutex'
+
+const S_MASK = toBN('0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
+const S_MAX = toBN('0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0')
 
 export function toTxType(t: string): TxType {
   t = truncateHexPrefix(t)
@@ -39,11 +42,39 @@ export function numToHex(num: BN, pad = 64) {
     let a = toBN(2).pow(toBN(pad * 4))
     num = a.sub(num.neg())
   }
-  const hex = truncateHexPrefix(numberToHex(num))
+  const hex = num.toString('hex')
   if (hex.length > pad) {
     logger.error(`hex size overflow: ${hex}; pad: ${pad}`)
   }
   return padLeft(hex, pad)
+}
+
+export function unpackSignature(packedSign: string) {
+  if (packedSign.length !== 128) {
+    throw new Error('Invalid packed signature length')
+  }
+
+  const r = packedSign.slice(0, 64)
+  const vs = packedSign.slice(64)
+
+  const vs_BN = toBN(vs)
+  const v = numToHex(toBN(27).add(vs_BN.shrn(255)), 2)
+
+  const s_BN = vs_BN.and(S_MASK)
+  const s = numToHex(s_BN)
+
+  if (s_BN.gt(S_MAX)) {
+    throw new Error(`Invalid signature 's' value`)
+  }
+
+  const sig = '0x' + r + s + v
+
+  // 2 + 64 + 64 + 2 = 132
+  if (sig.length !== 132) {
+    throw new Error('Invalid resulting signature length')
+  }
+
+  return sig
 }
 
 export function flattenProof(p: SnarkProof): string {

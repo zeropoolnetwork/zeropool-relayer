@@ -1,11 +1,17 @@
 import BN from 'bn.js'
-import { toBN } from 'web3-utils'
+import { toBN, AbiItem } from 'web3-utils'
 import { TxType, TxData, WithdrawTxData, PermittableDepositTxData, getTxData } from 'zp-memo-parser'
 import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
 import config from './config'
 import { pool, PoolTx } from './pool'
 import { NullifierSet } from './nullifierSet'
+import TokenAbi from './abi/token-abi.json'
+import { web3 } from './services/web3'
+import { numToHex, unpackSignature } from './utils/helpers'
+import { recoverSaltedPermit } from './utils/EIP712SaltedPermit'
+
+const tokenContract = new web3.eth.Contract(TokenAbi as AbiItem[], config.tokenAddress)
 
 const ZERO = toBN(0)
 
@@ -18,6 +24,11 @@ export interface Delta {
 
 export function checkSize(data: string, size: number) {
   return data.length === size
+}
+
+export async function checkBalance(address: string, minBalance: string) {
+  const balance = await tokenContract.methods.balanceOf(address).call()
+  return toBN(balance).gte(toBN(minBalance))
 }
 
 export function checkCommitment(treeProof: Proof, txProof: Proof) {
@@ -45,15 +56,14 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
     JSON.stringify(txData),
     msgValue.toString()
   )
-  const tokenAmountWithFee = tokenAmount.add(txData.fee)
   let isValid = false
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-    isValid = tokenAmountWithFee.gte(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
+    isValid = tokenAmount.gte(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
   } else if (txType === TxType.TRANSFER) {
-    isValid = tokenAmountWithFee.eq(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
+    isValid = tokenAmount.eq(ZERO) && energyAmount.eq(ZERO) && msgValue.eq(ZERO)
   } else if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
-    isValid = tokenAmountWithFee.lte(ZERO) && energyAmount.lte(ZERO)
+    isValid = tokenAmount.lte(ZERO) && energyAmount.lte(ZERO)
     isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
   return isValid
@@ -101,13 +111,54 @@ export async function checkAssertion(f: Function, errStr: string) {
   }
 }
 
+async function checkDepositEnoughBalance(
+  txType: TxType,
+  tokenAmount: BN,
+  depositSignature: string | null,
+  txData: TxData,
+  proofNullifier: string
+) {
+  if (!(txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT)) {
+    return true
+  }
+
+  // Signature without `0x` prefix, size is 64*2=128
+  await checkAssertion(() => depositSignature !== null && checkSize(depositSignature, 128), 'Invalid deposit signature')
+  const nullifier = '0x' + numToHex(toBN(proofNullifier))
+  const sig = unpackSignature(depositSignature as string)
+
+  let recoveredAddress: string
+  if (txType === TxType.DEPOSIT) {
+    recoveredAddress = web3.eth.accounts.recover(nullifier, sig)
+  } else {
+    const { deadline, holder } = txData as PermittableDepositTxData
+    const owner = new TextDecoder().decode(holder)
+    const nonce = await tokenContract.methods.nonces(owner).call()
+
+    recoveredAddress = recoverSaltedPermit(
+      {
+        owner,
+        spender: config.poolAddress as string,
+        value: tokenAmount.toString(10),
+        nonce,
+        deadline: deadline.toString(10),
+        salt: nullifier,
+      },
+      sig
+    )
+
+    await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
+  }
+
+  const requiredTokenAmount = tokenAmount.mul(pool.denominator)
+  return checkBalance(recoveredAddress, requiredTokenAmount.toString(10))
+}
+
 export async function validateTx({ txType, proof, memo, depositSignature }: PoolTx) {
   const buf = Buffer.from(memo, 'hex')
   const txData = getTxData(buf, txType)
 
   await checkAssertion(() => checkFee(txData.fee), `Fee too low`)
-  // Signature should start with `0x`, so size is 2+(64*2)=130
-  await checkAssertion(() => depositSignature === null || checkSize(depositSignature, 130), `Invalid signature`)
 
   if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
@@ -115,16 +166,20 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
   }
 
   if (txType === TxType.PERMITTABLE_DEPOSIT) {
-    const deadline = (txData as PermittableDepositTxData).deadline
-    await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
   }
 
   await checkAssertion(() => checkTxProof(proof), `Incorrect transfer proof`)
 
   const delta = parseDelta(proof.inputs[3])
 
+  const tokenAmountWithFee = delta.tokenAmount.add(txData.fee)
   await checkAssertion(
-    () => checkTxSpecificFields(txType, delta.tokenAmount, delta.energyAmount, txData, toBN('0')),
+    () => checkTxSpecificFields(txType, tokenAmountWithFee, delta.energyAmount, txData, toBN('0')),
     `Tx specific fields are incorrect`
+  )
+
+  await checkAssertion(
+    () => checkDepositEnoughBalance(txType, tokenAmountWithFee, depositSignature, txData, proof.inputs[1]),
+    'Not enough balance for deposit'
   )
 }

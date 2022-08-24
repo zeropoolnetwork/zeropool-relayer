@@ -6,8 +6,11 @@ import { Mutex } from 'async-mutex'
 
 import { createPoolTxWorker } from './poolTxWorker'
 import { createSentTxWorker } from './sentTxWorker'
+import { initializeDomain } from './utils/EIP712SaltedPermit'
 
 export async function init() {
+  await initializeDomain(web3)
+
   await pool.init()
   const gasPriceService = new GasPrice(web3, config.gasPriceUpdateInterval, config.gasPriceEstimationType, {})
   await gasPriceService.start()

@@ -6,11 +6,13 @@ import type { EstimationType } from './services/GasPrice'
 const relayerAddress = new Web3().eth.accounts.privateKeyToAccount(
   process.env.RELAYER_ADDRESS_PRIVATE_KEY as string
 ).address
+
 const config = {
   port: parseInt(process.env.PORT || '8000'),
   relayerAddress,
   relayerPrivateKey: process.env.RELAYER_ADDRESS_PRIVATE_KEY as string,
   poolAddress: process.env.POOL_ADDRESS,
+  tokenAddress: process.env.TOKEN_ADDRESS,
   relayerGasLimit: toBN(process.env.RELAYER_GAS_LIMIT as string),
   relayerFee: toBN(process.env.RELAYER_FEE as string),
   maxFaucet: toBN(process.env.MAX_NATIVE_AMOUNT_FAUCET as string),

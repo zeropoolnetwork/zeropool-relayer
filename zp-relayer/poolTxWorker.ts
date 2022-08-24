@@ -15,6 +15,7 @@ import { redis } from './services/redisClient'
 import { checkAssertion, checkNullifier, checkTransferIndex, parseDelta } from './validateTx'
 import type { EstimationType, GasPrice } from './services/GasPrice'
 import type { Mutex } from 'async-mutex'
+import { getChainId } from './utils/web3'
 
 const WORKER_OPTIONS = {
   autorun: false,
@@ -23,6 +24,7 @@ const WORKER_OPTIONS = {
 }
 
 export async function createPoolTxWorker<T extends EstimationType>(gasPrice: GasPrice<T>, mutex: Mutex) {
+  const CHAIN_ID = await getChainId(web3)
   const poolTxWorkerProcessor = async (job: Job<TxPayload[]>) => {
     const txs = job.data
 
@@ -63,7 +65,7 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
         value: toWei(toBN(amount)),
         gas,
         to: config.poolAddress,
-        chainId: pool.chainId,
+        chainId: CHAIN_ID,
         ...gasPriceOptions,
       }
       try {
