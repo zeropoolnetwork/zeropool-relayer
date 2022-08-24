@@ -13,5 +13,6 @@ app.use(createLoggerMiddleware('zp.log'))
 app.use(router)
 
 init().then(() => {
-  app.listen(config.port, () => logger.info(`Started relayer on port ${config.port}`))
+  const PORT = config.port
+  app.listen(PORT, () => logger.info(`Started relayer on port ${PORT}`))
 })
