@@ -14,7 +14,7 @@ export async function init() {
   await initPool()
 
   let gasPriceService = null
-  if (config.nearChain == 'evm') {
+  if (config.chain == 'evm') {
     gasPriceService = new GasPrice(web3, config.gasPriceUpdateInterval, config.gasPriceEstimationType, {})
     await gasPriceService.start()
   }

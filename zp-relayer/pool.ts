@@ -247,11 +247,11 @@ export let pool: Pool
 
 export async function initPool() {
   let chain: Chain
-  switch (config.nearChain) {
+  switch (config.chain) {
     case 'evm': chain = new EvmChain(); break
     case 'polkadot': chain = new PolkadotChain(); break
     case 'near': chain = new NearChain(); break
-    default: throw new Error(`Uknown chain '${config.nearChain}'`)
+    default: throw new Error(`Uknown chain '${config.chain}'`)
   }
 
   pool = new Pool(chain)

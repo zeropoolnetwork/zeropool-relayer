@@ -26,7 +26,7 @@ const config = {
   redisUrl: process.env.RELAYER_REDIS_URL,
   rpcUrl: process.env.RPC_URL as string,
   sentTxDelay: parseInt(process.env.SENT_TX_DELAY || '30000'),
-  nearChain: process.env.NEAR_CHAIN,
+  chain: process.env.RELAYER_CHAIN,
   nearNetworkId: process.env.NEAR_NETWORK_ID,
   nearIndexerUrl: process.env.NEAR_INDEXER_URL,
   nearAccountName: process.env.NEAR_ACCOUNT_NAME,

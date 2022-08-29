@@ -24,7 +24,7 @@ const WORKER_OPTIONS = {
 
 export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex, gasPrice: GasPrice<T> | null) {
   let chainId = 0
-  if (config.nearChain == 'evm') {
+  if (config.chain == 'evm') {
     chainId = await getChainId(web3)
   }
 
