@@ -1,4 +1,4 @@
-import { pool } from './pool'
+import { initPool } from './pool'
 import { GasPrice } from './services/GasPrice'
 import { web3 } from './services/web3'
 import config from './config'
@@ -11,10 +11,17 @@ import { initializeDomain } from './utils/EIP712SaltedPermit'
 export async function init() {
   await initializeDomain(web3)
 
-  await pool.init()
-  const gasPriceService = new GasPrice(web3, config.gasPriceUpdateInterval, config.gasPriceEstimationType, {})
-  await gasPriceService.start()
-  const workerMutex = new Mutex()
-  ;(await createPoolTxWorker(gasPriceService, workerMutex)).run()
-  ;(await createSentTxWorker(gasPriceService, workerMutex)).run()
+  await initPool()
+
+  let gasPriceService = null
+  if (config.nearChain == 'evm') {
+    gasPriceService = new GasPrice(web3, config.gasPriceUpdateInterval, config.gasPriceEstimationType, {})
+    await gasPriceService.start()
+  }
+
+  const workerMutex = new Mutex();
+  const poolTxWorker = await createPoolTxWorker(workerMutex, gasPriceService)
+  poolTxWorker.run()
+  const sendTxWorker = await createSentTxWorker(workerMutex, gasPriceService)
+  sendTxWorker.run()
 }

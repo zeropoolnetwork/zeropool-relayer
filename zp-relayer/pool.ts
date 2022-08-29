@@ -16,6 +16,10 @@ import { TxType } from 'zp-memo-parser'
 import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { OUTPLUSONE } from './utils/constants'
+import { Chain } from './chains/chain'
+import { initPolkadot, PolkadotChain } from './chains/polkadot'
+import { EvmChain } from './chains/evm'
+import { NearChain } from './chains/near'
 
 export interface PoolTx {
   proof: Proof
@@ -61,29 +65,29 @@ export interface LimitsFetch {
 }
 
 class Pool {
-  public PoolInstance: Contract
   public treeParams: Params
   private txVK: VK
   public state: PoolState
   public optimisticState: PoolState
   public denominator: BN = toBN(1)
   public isInitialized = false
+  public chain: Chain
 
-  constructor() {
-    this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
-
+  constructor(chain: Chain) {
     this.treeParams = Params.fromFile(config.treeUpdateParamsPath)
     const txVK = require(config.txVKPath)
     this.txVK = txVK
 
-    this.state = new PoolState('pool')
-    this.optimisticState = new PoolState('optimistic')
+    this.state = new PoolState(`${config.storagePrefix}.pool`)
+    this.optimisticState = new PoolState(`${config.storagePrefix}.optimistic`)
+    this.chain = chain
   }
 
   async init() {
     if (this.isInitialized) return
 
-    this.denominator = toBN(await this.PoolInstance.methods.denominator().call())
+    this.chain.init()
+    this.denominator = toBN(await this.chain.getDenominator())
     await this.syncState()
     this.isInitialized = true
   }
@@ -131,48 +135,44 @@ class Pool {
       missedIndices[i] = localIndex + (i + 1) * OUTPLUSONE
     }
 
-    const events = await getEvents(this.PoolInstance, 'Message', {
-      fromBlock,
-      filter: {
-        index: missedIndices,
-      },
-    })
+    const events = await this.chain.getNewEvents()
 
-    if (events.length !== missedIndices.length) {
-      logger.error('Not all events found')
-      return
-    }
+    // const events = await getEvents(this.PoolInstance, 'Message', {
+    //   fromBlock,
+    //   filter: {
+    //     index: missedIndices,
+    //   },
+    // })
+
+    // if (events.length !== missedIndices.length) {
+    //   logger.error('Not all events found')
+    //   return
+    // }
 
     for (let i = 0; i < events.length; i++) {
-      const { returnValues, transactionHash } = events[i]
-      const memoString: string = returnValues.message
-      if (!memoString) {
-        throw new Error('incorrect memo in event')
-      }
+      const { data, transactionHash } = events[i]
+      // const { input } = await getTransaction(web3, transactionHash)
+      // const calldata = Buffer.from(truncateHexPrefix(input), 'hex')
 
-      const { input } = await getTransaction(web3, transactionHash)
-      const calldata = Buffer.from(truncateHexPrefix(input), 'hex')
+      const parser = pool.chain.parseCalldata(data)
 
-      const parser = new PoolCalldataParser(calldata)
+      // await this.state.nullifiers.add([web3.utils.hexToNumberString(nullifier)])
+      await this.state.nullifiers.add([parser.nullifier.toString()])
 
-      const nullifier = parser.getField('nullifier')
-      await this.state.nullifiers.add([web3.utils.hexToNumberString(nullifier)])
+      const outCommit = parser.outCommit
+      // const outCommit = web3.utils.hexToNumberString(outCommitRaw)
 
-      const outCommitRaw = parser.getField('outCommit')
-      const outCommit = web3.utils.hexToNumberString(outCommitRaw)
+      const txType = parser.txType
+      // const txType = toTxType(txTypeRaw)
 
-      const txTypeRaw = parser.getField('txType')
-      const txType = toTxType(txTypeRaw)
-
-      const memoSize = web3.utils.hexToNumber(parser.getField('memoSize'))
-      const memoRaw = truncateHexPrefix(parser.getField('memo', memoSize))
+      const memoRaw = Buffer.from(parser.memo).toString('hex')
 
       const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-      const commitAndMemo = numToHex(toBN(outCommit)).concat(transactionHash.slice(2)).concat(truncatedMemo)
+      const commitAndMemo = numToHex(outCommit).concat(transactionHash.slice(2)).concat(truncatedMemo)
 
-      const index = Number(returnValues.index) - OUTPLUSONE
+      const index = parser.transferIndex.toNumber() - OUTPLUSONE
       for (let state of [this.state, this.optimisticState]) {
-        state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit))
+        state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
         state.addTx(index, Buffer.from(commitAndMemo, 'hex'))
       }
     }
@@ -185,7 +185,7 @@ class Pool {
   }
 
   async getContractIndex() {
-    const poolIndex = await this.PoolInstance.methods.pool_index().call()
+    const poolIndex = await this.chain.getContractTransferNum()
     return Number(poolIndex)
   }
 
@@ -194,7 +194,7 @@ class Pool {
       index = await this.getContractIndex()
       logger.info('CONTRACT INDEX %d', index)
     }
-    const root = await this.PoolInstance.methods.roots(index).call()
+    const root = await this.chain.getContractMerkleRoot(index)
     return root.toString()
   }
 
@@ -243,5 +243,19 @@ class Pool {
   }
 }
 
-export const pool = new Pool()
+export let pool: Pool
+
+export async function initPool() {
+  let chain: Chain
+  switch (config.nearChain) {
+    case 'evm': chain = new EvmChain(); break
+    case 'polkadot': chain = new PolkadotChain(); break
+    case 'near': chain = new NearChain(); break
+    default: throw new Error(`Uknown chain '${config.nearChain}'`)
+  }
+
+  pool = new Pool(chain)
+  pool.init()
+}
+
 export type { Pool }

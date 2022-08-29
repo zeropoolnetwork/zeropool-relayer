@@ -8,8 +8,9 @@ import { redis } from '../services/redisClient'
 import type { GasPrice, EstimationType, GasPriceValue } from '../services/GasPrice'
 import type { TransactionConfig } from 'web3-core'
 import type { Mutex } from 'async-mutex'
+
 import { withMutex } from '../utils/helpers'
-import config from '../config'
+import { TxStatus } from '../chains/chain'
 
 const token = 'RELAYER'
 
@@ -58,7 +59,7 @@ async function collectBatch<T>(queue: Queue<T>) {
   return jobs
 }
 
-export async function createSentTxWorker<T extends EstimationType>(gasPrice: GasPrice<T>, mutex: Mutex) {
+export async function createSentTxWorker<T extends EstimationType>(mutex: Mutex, gasPrice: GasPrice<T> | null) {
   const sentTxWorkerProcessor = async (job: Job<SentTxPayload>) => {
     const logPrefix = `SENT WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
@@ -70,70 +71,75 @@ export async function createSentTxWorker<T extends EstimationType>(gasPrice: Gas
 
     const { txHash, txData, commitIndex, outCommit, nullifier, payload } = job.data
 
-    const tx = await web3.eth.getTransactionReceipt(txHash)
-    if (tx) {
-      // Tx mined
-      if (tx.status) {
-        // Successful
-        logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockNumber)
+    const tx = await pool.chain.getTxStatus(txHash)
+    const status = tx.status
 
-        pool.state.updateState(commitIndex, outCommit, txData)
+    // Tx mined
+    if (status == TxStatus.Mined) {
+      // Successful
+      logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockId)
 
-        // Add nullifer to confirmed state and remove from optimistic one
-        logger.info('Adding nullifier %s to PS', nullifier)
-        await pool.state.nullifiers.add([nullifier])
-        logger.info('Removing nullifier %s from OS', nullifier)
-        await pool.optimisticState.nullifiers.remove([nullifier])
+      pool.state.updateState(commitIndex, outCommit, txData)
 
-        const node1 = pool.state.getCommitment(commitIndex)
-        const node2 = pool.optimisticState.getCommitment(commitIndex)
-        logger.info(`Assert commitments are equal: ${node1}, ${node2}`)
-        if (node1 !== node2) {
-          logger.error('Commitments are not equal')
-        }
+      // Add nullifer to confirmed state and remove from optimistic one
+      logger.info('Adding nullifier %s to PS', nullifier)
+      await pool.state.nullifiers.add([nullifier])
+      logger.info('Removing nullifier %s from OS', nullifier)
+      await pool.optimisticState.nullifiers.remove([nullifier])
 
-        return txHash
-      } else {
-        // Revert
-        logger.error('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockNumber)
-
-        // TODO: a more efficient strategy would be to collect all other jobs
-        // and move them to 'failed' state as we know they will be reverted
-        // To do this we need to acquire a lock for each job. Did not find
-        // an easy way to do that yet. See 'collectBatch'
-        const jobs = await sentTxQueue.getJobs(['delayed', 'waiting'])
-        const ids = jobs.map(j => j.id as string)
-        logger.info('%s marking ids %j as failed', logPrefix, ids)
-        await markFailed(ids)
-
-        logger.info('Rollback optimistic state...')
-        pool.optimisticState.rollbackTo(pool.state)
-        logger.info('Clearing optimistic nullifiers...')
-        await pool.optimisticState.nullifiers.clear()
-        const root1 = pool.state.getMerkleRoot()
-        const root2 = pool.optimisticState.getMerkleRoot()
-        logger.info(`Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`)
+      const node1 = pool.state.getCommitment(commitIndex)
+      const node2 = pool.optimisticState.getCommitment(commitIndex)
+      logger.info(`Assert commitments are equal: ${node1}, ${node2}`)
+      if (node1 !== node2) {
+        logger.error('Commitments are not equal')
       }
+
+      return txHash
+    } else if (status == TxStatus.Error) {
+      // Revert
+      logger.error('%s Transaction %s reverted at block %s', logPrefix, txHash, tx.blockId)
+
+      // TODO: a more efficient strategy would be to collect all other jobs
+      // and move them to 'failed' state as we know they will be reverted
+      // To do this we need to acquire a lock for each job. Did not find
+      // an easy way to do that yet. See 'collectBatch'
+      const jobs = await sentTxQueue.getJobs(['delayed', 'waiting'])
+      const ids = jobs.map(j => j.id as string)
+      logger.info('%s marking ids %j as failed', logPrefix, ids)
+      await markFailed(ids)
+
+      logger.info('Rollback optimistic state...')
+      pool.optimisticState.rollbackTo(pool.state)
+      logger.info('Clearing optimistic nullifiers...')
+      await pool.optimisticState.nullifiers.clear()
+      const root1 = pool.state.getMerkleRoot()
+      const root2 = pool.optimisticState.getMerkleRoot()
+      logger.info(`Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`)
     } else {
-      const txConfig = job.data.txConfig
+      console.warn('Gas price adjustment is not implemented')
+      // const txConfig = job.data.txConfig
 
-      const oldGasPrice = txConfig.gasPrice
-      const newGasPrice = gasPrice.getPrice()
+      // const oldGasPrice = txConfig.gasPrice
+      // let newGasPrice
+      // if (gasPrice) {
+      //   newGasPrice = gasPrice.getPrice()
+      // }
 
-      logger.warn('Tx unmined; updating gasPrice: %o -> %o', oldGasPrice, newGasPrice)
+      // logger.warn('Tx unmined; updating gasPrice: %o -> %o', oldGasPrice, newGasPrice)
 
-      const newTxConfig = updateTxGasPrice(txConfig, newGasPrice)
+      // const newTxConfig = updateTxGasPrice(txConfig, newGasPrice)
 
-      const newJobData = {
-        ...job.data,
-        txConfig: newTxConfig,
-      }
+      // const newJobData = {
+      //   ...job.data,
+      //   txConfig: newTxConfig,
+      // }
 
-      await sentTxQueue.add(txHash, newJobData, {
-        priority: txConfig.nonce,
-        delay: config.sentTxDelay,
-      })
+      // await sentTxQueue.add(txHash, newJobData, {
+      //   priority: txConfig.nonce,
+      //   delay: config.sentTxDelay,
+      // })
     }
+
   }
   const sentTxWorker = new Worker<SentTxPayload>(
     SENT_TX_QUEUE_NAME,

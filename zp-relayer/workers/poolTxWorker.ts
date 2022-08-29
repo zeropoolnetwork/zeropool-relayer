@@ -1,21 +1,20 @@
-import { toBN, toWei } from 'web3-utils'
+import { toBN } from 'web3-utils'
 import { Job, Worker } from 'bullmq'
+import type { Mutex } from 'async-mutex'
+
 import { web3 } from '../services/web3'
 import { logger } from '../services/appLogger'
-import { TxPayload } from '../queue/poolTxQueue'
 import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT } from '../utils/constants'
 import { readNonce, updateField, RelayerKeys, incrNonce } from '../utils/redisFields'
 import { numToHex, truncateMemoTxPrefix, withMutex } from '../utils/helpers'
-import { signAndSend } from '../tx/signAndSend'
 import { pool } from '../pool'
-import { sentTxQueue } from '../queue/sentTxQueue'
-import { processTx } from '../txProcessor'
 import config from '../config'
 import { redis } from '../services/redisClient'
-import { checkAssertion, checkLimits, checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
+import { checkAssertion, checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
 import type { EstimationType, GasPrice } from '../services/GasPrice'
-import type { Mutex } from 'async-mutex'
 import { getChainId } from '../utils/web3'
+import { TxPayload } from '../queue/poolTxQueue'
+import { sentTxQueue } from '../queue/sentTxQueue';
 
 const WORKER_OPTIONS = {
   autorun: false,
@@ -23,8 +22,12 @@ const WORKER_OPTIONS = {
   concurrency: 1,
 }
 
-export async function createPoolTxWorker<T extends EstimationType>(gasPrice: GasPrice<T>, mutex: Mutex) {
-  const CHAIN_ID = await getChainId(web3)
+export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex, gasPrice: GasPrice<T> | null) {
+  let chainId = 0
+  if (config.nearChain == 'evm') {
+    chainId = await getChainId(web3)
+  }
+
   const poolTxWorkerProcessor = async (job: Job<TxPayload[]>) => {
     const txs = job.data
 
@@ -44,23 +47,27 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
       await checkAssertion(() => checkNullifier(nullifier, pool.optimisticState.nullifiers))
       await checkAssertion(() => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex))
 
-      const { data, commitIndex } = await processTx(job.id as string, tx, pool)
+      const { data, commitIndex } = await pool.chain.processTx(job.id as string, tx, pool)
 
       const nonce = await incrNonce()
       logger.info(`${logPrefix} nonce: ${nonce}`)
 
-      const gasPriceOptions = gasPrice.getPrice()
-      const txConfig = {
-        data,
-        nonce,
-        value: toWei(toBN(amount)),
-        gas,
-        to: config.poolAddress,
-        chainId: CHAIN_ID,
-        ...gasPriceOptions,
+      let gasPriceOptions = {}
+      if (gasPrice) {
+        gasPriceOptions = gasPrice.getPrice()
       }
+
+      // const txConfig = {
+      //   data,
+      //   nonce,
+      //   value: toWei(toBN(amount)),
+      //   gas,
+      //   to: config.poolAddress,
+      //   chainId: chainId,
+      //   ...gasPriceOptions,
+      // }
       try {
-        const txHash = await signAndSend(txConfig, config.relayerPrivateKey, web3)
+        const txHash = await pool.chain.signAndSend({ data, nonce, gas, amount })
         logger.debug(`${logPrefix} TX hash ${txHash}`)
 
         await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
@@ -87,7 +94,7 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
           },
           {
             delay: config.sentTxDelay,
-            priority: txConfig.nonce,
+            priority: nonce,
           }
         )
 

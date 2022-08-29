@@ -9,6 +9,7 @@ const relayerAddress = new Web3().eth.accounts.privateKeyToAccount(
 
 const config = {
   port: parseInt(process.env.PORT || '8000'),
+  storagePrefix: process.env.STORAGE_PREFIX,
   relayerAddress,
   relayerPrivateKey: process.env.RELAYER_ADDRESS_PRIVATE_KEY as string,
   poolAddress: process.env.POOL_ADDRESS,
@@ -25,6 +26,12 @@ const config = {
   redisUrl: process.env.RELAYER_REDIS_URL,
   rpcUrl: process.env.RPC_URL as string,
   sentTxDelay: parseInt(process.env.SENT_TX_DELAY || '30000'),
+  nearChain: process.env.NEAR_CHAIN,
+  nearNetworkId: process.env.NEAR_NETWORK_ID,
+  nearIndexerUrl: process.env.NEAR_INDEXER_URL,
+  nearAccountName: process.env.NEAR_ACCOUNT_NAME,
+  nearNodeUrl: process.env.NEAR_NODE_URL,
+  nearWalletUrl: process.env.NEAR_WALLET_URL,
 }
 
 export default config
