@@ -126,31 +126,30 @@ async function checkDepositEnoughBalance(
   await checkAssertion(() => depositSignature !== null && checkSize(depositSignature, 128), 'Invalid deposit signature')
   const nullifier = '0x' + numToHex(toBN(proofNullifier))
   const sig = unpackSignature(depositSignature as string)
+  const requiredTokenAmount = tokenAmount.mul(pool.denominator)
 
   let recoveredAddress: string
   if (txType === TxType.DEPOSIT) {
     recoveredAddress = web3.eth.accounts.recover(nullifier, sig)
   } else {
     const { deadline, holder } = txData as PermittableDepositTxData
-    const owner = new TextDecoder().decode(holder)
+    const owner = web3.utils.toChecksumAddress(web3.utils.bytesToHex(Array.from(holder)))
+    const spender = web3.utils.toChecksumAddress(config.poolAddress as string)
     const nonce = await tokenContract.methods.nonces(owner).call()
 
-    recoveredAddress = recoverSaltedPermit(
-      {
-        owner,
-        spender: config.poolAddress as string,
-        value: tokenAmount.toString(10),
-        nonce,
-        deadline: deadline.toString(10),
-        salt: nullifier,
-      },
-      sig
-    )
+    const message = {
+      owner,
+      spender,
+      value: requiredTokenAmount.toString(10),
+      nonce,
+      deadline: deadline.toString(10),
+      salt: nullifier,
+    }
+    recoveredAddress = recoverSaltedPermit(message, sig)
 
     await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
   }
 
-  const requiredTokenAmount = tokenAmount.mul(pool.denominator)
   return checkBalance(recoveredAddress, requiredTokenAmount.toString(10))
 }
 
@@ -158,24 +157,21 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
   const buf = Buffer.from(memo, 'hex')
   const txData = getTxData(buf, txType)
 
-  await checkAssertion(() => checkFee(txData.fee), `Fee too low`)
+  await checkAssertion(() => checkFee(txData.fee), 'Fee too low')
 
   if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
-    await checkAssertion(() => checkNativeAmount(nativeAmount), `Native amount too high`)
+    await checkAssertion(() => checkNativeAmount(nativeAmount), 'Native amount too high')
   }
 
-  if (txType === TxType.PERMITTABLE_DEPOSIT) {
-  }
-
-  await checkAssertion(() => checkTxProof(proof), `Incorrect transfer proof`)
+  await checkAssertion(() => checkTxProof(proof), 'Incorrect transfer proof')
 
   const delta = parseDelta(proof.inputs[3])
 
   const tokenAmountWithFee = delta.tokenAmount.add(txData.fee)
   await checkAssertion(
     () => checkTxSpecificFields(txType, tokenAmountWithFee, delta.energyAmount, txData, toBN('0')),
-    `Tx specific fields are incorrect`
+    'Tx specific fields are incorrect'
   )
 
   await checkAssertion(

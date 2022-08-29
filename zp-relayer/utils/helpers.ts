@@ -50,6 +50,10 @@ export function numToHex(num: BN, pad = 64) {
 }
 
 export function unpackSignature(packedSign: string) {
+  if (packedSign.length === 130) {
+    return '0x' + packedSign
+  }
+
   if (packedSign.length !== 128) {
     throw new Error('Invalid packed signature length')
   }

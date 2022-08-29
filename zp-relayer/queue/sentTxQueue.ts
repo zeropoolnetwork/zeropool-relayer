@@ -1,5 +1,5 @@
 import { Queue, QueueScheduler } from 'bullmq'
-import { redis } from './redisClient'
+import { redis } from '../services/redisClient'
 import { SENT_TX_QUEUE_NAME } from '../utils/constants'
 import { TxPayload } from './poolTxQueue'
 import type { TransactionConfig } from 'web3-core'
