@@ -4,8 +4,8 @@ import { web3 } from './services/web3'
 import config from './config'
 import { Mutex } from 'async-mutex'
 
-import { createPoolTxWorker } from './poolTxWorker'
-import { createSentTxWorker } from './sentTxWorker'
+import { createPoolTxWorker } from './workers/poolTxWorker'
+import { createSentTxWorker } from './workers/sentTxWorker'
 import { initializeDomain } from './utils/EIP712SaltedPermit'
 
 export async function init() {

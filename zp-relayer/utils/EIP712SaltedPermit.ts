@@ -50,7 +50,7 @@ export async function initializeDomain(web3: Web3) {
     name,
     version: '1',
     chainId,
-    verifyingContract: config.poolAddress as string,
+    verifyingContract: config.tokenAddress as string,
   }
 }
 
