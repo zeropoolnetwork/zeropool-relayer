@@ -17,6 +17,16 @@ export function toTxType(t: string): TxType {
   }
 }
 
+export function numToTxType(num: number): TxType {
+  switch (num) {
+    case 0: return TxType.DEPOSIT
+    case 1: return TxType.TRANSFER
+    case 2: return TxType.WITHDRAWAL
+    case 3: return TxType.PERMITTABLE_DEPOSIT
+    default: throw new Error('incorrect tx type')
+  }
+}
+
 const txTypePrefixLen = {
   [TxType.DEPOSIT]: 16,
   [TxType.TRANSFER]: 16,

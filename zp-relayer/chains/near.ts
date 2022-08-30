@@ -71,7 +71,7 @@ export class NearChain implements Chain {
     switch (txType) {
       case TxType.DEPOSIT: numTxType = 0; break
       case TxType.TRANSFER: numTxType = 1; break
-      case TxType.WITHDRAW: numTxType = 2; break
+      case TxType.WITHDRAWAL: numTxType = 2; break
       default: throw new Error(`Unsupported tx type: ${txType}`)
     }
 

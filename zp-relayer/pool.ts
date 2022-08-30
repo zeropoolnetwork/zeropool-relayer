@@ -13,7 +13,7 @@ import { validateTx } from './validateTx'
 import { PoolState } from './state'
 
 import { TxType } from 'zp-memo-parser'
-import { numToHex, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
+import { numToHex, numToTxType, toTxType, truncateHexPrefix, truncateMemoTxPrefix } from './utils/helpers'
 import { PoolCalldataParser } from './utils/PoolCalldataParser'
 import { OUTPLUSONE } from './utils/constants'
 import { Chain } from './chains/chain'
@@ -162,8 +162,8 @@ class Pool {
       const outCommit = parser.outCommit
       // const outCommit = web3.utils.hexToNumberString(outCommitRaw)
 
-      const txType = parser.txType
-      // const txType = toTxType(txTypeRaw)
+      const txTypeRaw = parser.txType
+      const txType = numToTxType(txTypeRaw)
 
       const memoRaw = Buffer.from(parser.memo).toString('hex')
 
