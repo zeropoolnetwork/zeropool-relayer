@@ -2,19 +2,10 @@ import Ajv, { JSONSchemaType } from 'ajv'
 import { Proof, SnarkProof } from 'libzkbob-rs-node'
 import type { PoolTx } from '../pool'
 import { TxType } from 'zp-memo-parser'
-import { isAddress } from 'web3-utils'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 const ajv = new Ajv({ allErrors: true, coerceTypes: true, useDefaults: true })
-
-ajv.addKeyword({
-  keyword: 'isAddress',
-  validate: (schema: any, address: string) => {
-    return isAddress(address)
-  },
-  errors: true,
-})
 
 const AjvString: JSONSchemaType<string> = { type: 'string' }
 
@@ -22,7 +13,6 @@ const AjvNullableAddress: JSONSchemaType<string> = {
   type: 'string',
   pattern: '^0x[a-fA-F0-9]{40}$',
   default: ZERO_ADDRESS,
-  isAddress: true,
 }
 
 const AjvG1Point: JSONSchemaType<[string, string]> = {

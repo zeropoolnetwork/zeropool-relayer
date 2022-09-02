@@ -15,7 +15,7 @@
   "dependencies": {
     "@metamask/eth-sig-util": "^4.0.1",
     "@mycrypto/gas-estimation": "^1.1.0",
-    "ajv": "^8.11.0",
+    "ajv": "8.11.0",
     "async-mutex": "^0.3.2",
     "bullmq": "1.83.0",
     "cors": "^2.8.5",
