@@ -4,7 +4,7 @@ import { TxType, TxData, WithdrawTxData, PermittableDepositTxData, getTxData } f
 import { Helpers, Proof } from 'libzkbob-rs-node'
 import { logger } from './services/appLogger'
 import config from './config'
-import { pool, PoolTx } from './pool'
+import { Limits, pool, PoolTx } from './pool'
 import { NullifierSet } from './nullifierSet'
 import TokenAbi from './abi/token-abi.json'
 import { web3 } from './services/web3'
@@ -111,27 +111,30 @@ export async function checkAssertion(f: Function, errStr: string) {
   }
 }
 
-async function checkDepositEnoughBalance(
-  txType: TxType,
-  tokenAmount: BN,
-  depositSignature: string | null,
-  txData: TxData,
-  proofNullifier: string
-) {
-  if (!(txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT)) {
-    return true
+async function checkDepositEnoughBalance(address: string, requiredTokenAmount: BN) {
+  if (requiredTokenAmount.lte(toBN(0))) {
+    throw new Error('Requested balance check for token amount <= 0')
   }
 
+  return checkBalance(address, requiredTokenAmount.toString(10))
+}
+
+async function getRecoveredAddress(
+  txType: TxType,
+  proofNullifier: string,
+  txData: TxData,
+  tokenAmount: BN,
+  depositSignature: string | null
+) {
   // Signature without `0x` prefix, size is 64*2=128
   await checkAssertion(() => depositSignature !== null && checkSize(depositSignature, 128), 'Invalid deposit signature')
   const nullifier = '0x' + numToHex(toBN(proofNullifier))
   const sig = unpackSignature(depositSignature as string)
-  const requiredTokenAmount = tokenAmount.mul(pool.denominator)
 
   let recoveredAddress: string
   if (txType === TxType.DEPOSIT) {
     recoveredAddress = web3.eth.accounts.recover(nullifier, sig)
-  } else {
+  } else if (txType === TxType.PERMITTABLE_DEPOSIT) {
     const { deadline, holder } = txData as PermittableDepositTxData
     const owner = web3.utils.toChecksumAddress(web3.utils.bytesToHex(Array.from(holder)))
     const spender = web3.utils.toChecksumAddress(config.poolAddress as string)
@@ -140,7 +143,7 @@ async function checkDepositEnoughBalance(
     const message = {
       owner,
       spender,
-      value: requiredTokenAmount.toString(10),
+      value: tokenAmount.toString(10),
       nonce,
       deadline: deadline.toString(10),
       salt: nullifier,
@@ -148,9 +151,11 @@ async function checkDepositEnoughBalance(
     recoveredAddress = recoverSaltedPermit(message, sig)
 
     await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
+  } else {
+    throw new Error('Unsupported txtype')
   }
 
-  return checkBalance(recoveredAddress, requiredTokenAmount.toString(10))
+  return recoveredAddress
 }
 
 export async function validateTx({ txType, proof, memo, depositSignature }: PoolTx) {
@@ -174,8 +179,18 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
     'Tx specific fields are incorrect'
   )
 
-  await checkAssertion(
-    () => checkDepositEnoughBalance(txType, tokenAmountWithFee, depositSignature, txData, proof.inputs[1]),
-    'Not enough balance for deposit'
-  )
+  const requiredTokenAmount = tokenAmountWithFee.mul(pool.denominator)
+  if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
+    const recoveredAddress = await getRecoveredAddress(
+      txType,
+      proof.inputs[1],
+      txData,
+      requiredTokenAmount,
+      depositSignature
+    )
+    await checkAssertion(
+      () => checkDepositEnoughBalance(recoveredAddress, requiredTokenAmount),
+      'Not enough balance for deposit'
+    )
+  }
 }

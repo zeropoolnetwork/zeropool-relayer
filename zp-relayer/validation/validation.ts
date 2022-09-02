@@ -1,11 +1,30 @@
-import Ajv, { JSONSchemaType, ValidateFunction } from 'ajv'
+import Ajv, { JSONSchemaType } from 'ajv'
 import { Proof, SnarkProof } from 'libzkbob-rs-node'
 import type { PoolTx } from '../pool'
 import { TxType } from 'zp-memo-parser'
+import { isAddress } from 'web3-utils'
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 const ajv = new Ajv({ allErrors: true, coerceTypes: true, useDefaults: true })
 
+ajv.addKeyword({
+  keyword: 'isAddress',
+  validate: (schema: any, address: string) => {
+    return isAddress(address)
+  },
+  errors: true,
+})
+
 const AjvString: JSONSchemaType<string> = { type: 'string' }
+
+const AjvNullableAddress: JSONSchemaType<string> = {
+  type: 'string',
+  pattern: '^0x[a-fA-F0-9]{40}$',
+  default: ZERO_ADDRESS,
+  isAddress: true,
+}
+
 const AjvG1Point: JSONSchemaType<[string, string]> = {
   type: 'array',
   minItems: 2,
@@ -106,12 +125,18 @@ const AjvGetTransactionsV2Schema: JSONSchemaType<{
   required: [],
 }
 
-const validateSendTransaction = ajv.compile(AjvSendTransactionSchema)
-const validateSendTransactions = ajv.compile(AjvSendTransactionsSchema)
-const validateGetTransactions = ajv.compile(AjvGetTransactionsSchema)
-const validateGetTransactionsV2 = ajv.compile(AjvGetTransactionsV2Schema)
+const AjvGetLimitsSchema: JSONSchemaType<{
+  address: string
+}> = {
+  type: 'object',
+  properties: {
+    address: AjvNullableAddress,
+  },
+  required: [],
+}
 
-function checkErrors(validate: ValidateFunction) {
+function checkErrors<T>(schema: JSONSchemaType<T>) {
+  const validate = ajv.compile(schema)
   return (data: any) => {
     validate(data)
     if (validate.errors) {
@@ -123,7 +148,8 @@ function checkErrors(validate: ValidateFunction) {
   }
 }
 
-export const checkSendTransactionErrors = checkErrors(validateSendTransaction)
-export const checkSendTransactionsErrors = checkErrors(validateSendTransactions)
-export const checkGetTransactions = checkErrors(validateGetTransactions)
-export const checkGetTransactionsV2 = checkErrors(validateGetTransactionsV2)
+export const checkSendTransactionErrors = checkErrors(AjvSendTransactionSchema)
+export const checkSendTransactionsErrors = checkErrors(AjvSendTransactionsSchema)
+export const checkGetTransactions = checkErrors(AjvGetTransactionsSchema)
+export const checkGetTransactionsV2 = checkErrors(AjvGetTransactionsV2Schema)
+export const checkGetLimits = checkErrors(AjvGetLimitsSchema)

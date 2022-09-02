@@ -24,6 +24,42 @@ export interface PoolTx {
   depositSignature: string | null
 }
 
+export interface Limits {
+  tvlCap: BN
+  tvl: BN
+  dailyDepositCap: BN
+  dailyDepositCapUsage: BN
+  dailyWithdrawalCap: BN
+  dailyWithdrawalCapUsage: BN
+  dailyUserDepositCap: BN
+  dailyUserDepositCapUsage: BN
+  depositCap: BN
+}
+
+export interface LimitsFetch {
+  deposit: {
+    singleOperation: string
+    daylyForAddress: {
+      total: string
+      available: string
+    }
+    daylyForAll: {
+      total: string
+      available: string
+    }
+    poolLimit: {
+      total: string
+      available: string
+    }
+  }
+  withdraw: {
+    daylyForAll: {
+      total: string
+      available: string
+    }
+  }
+}
+
 class Pool {
   public PoolInstance: Contract
   public treeParams: Params
@@ -160,6 +196,48 @@ class Pool {
     }
     const root = await this.PoolInstance.methods.roots(index).call()
     return root.toString()
+  }
+
+  async getLimitsFor(address: string): Promise<Limits> {
+    const limits = await this.PoolInstance.methods.getLimitsFor(address).call()
+    return {
+      tvlCap: toBN(limits.tvlCap),
+      tvl: toBN(limits.tvl),
+      dailyDepositCap: toBN(limits.dailyDepositCap),
+      dailyDepositCapUsage: toBN(limits.dailyDepositCapUsage),
+      dailyWithdrawalCap: toBN(limits.dailyWithdrawalCap),
+      dailyWithdrawalCapUsage: toBN(limits.dailyUserDepositCapUsage),
+      dailyUserDepositCap: toBN(limits.dailyUserDepositCap),
+      dailyUserDepositCapUsage: toBN(limits.dailyUserDepositCapUsage),
+      depositCap: toBN(limits.depositCap),
+    }
+  }
+
+  processLimits(limits: Limits): LimitsFetch {
+    const limitsFetch = {
+      deposit: {
+        singleOperation: limits.depositCap.toString(10),
+        daylyForAddress: {
+          total: limits.dailyUserDepositCap.toString(10),
+          available: limits.dailyUserDepositCap.sub(limits.dailyUserDepositCapUsage).toString(10),
+        },
+        daylyForAll: {
+          total: limits.dailyDepositCap.toString(10),
+          available: limits.dailyDepositCap.sub(limits.dailyDepositCapUsage).toString(10),
+        },
+        poolLimit: {
+          total: limits.tvlCap.toString(10),
+          available: limits.tvlCap.sub(limits.tvl).toString(10),
+        },
+      },
+      withdraw: {
+        daylyForAll: {
+          total: limits.dailyWithdrawalCap.toString(10),
+          available: limits.dailyWithdrawalCap.sub(limits.dailyWithdrawalCapUsage).toString(10),
+        },
+      },
+    }
+    return limitsFetch
   }
 }
 

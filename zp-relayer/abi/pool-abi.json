@@ -7,29 +7,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "contract IERC20",
+        "internalType": "address",
         "name": "_token",
         "type": "address"
-      },
-      {
-        "internalType": "contract IMintable",
-        "name": "_voucher_token",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_denominator",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_energy_denominator",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_native_denominator",
-        "type": "uint256"
       },
       {
         "internalType": "contract ITransferVerifier",
@@ -40,16 +20,6 @@
         "internalType": "contract ITreeVerifier",
         "name": "_tree_verifier",
         "type": "address"
-      },
-      {
-        "internalType": "contract IOperatorManager",
-        "name": "_operatorManager",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_first_root",
-        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
@@ -81,6 +51,44 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "accumulatedFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "all_messages_hash",
     "outputs": [
@@ -103,33 +111,111 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "stateMutability": "pure",
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "energy_denominator",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "getLimitsFor",
     "outputs": [
       {
-        "internalType": "uint256",
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "tvlCap",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tvl",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyDepositCap",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyDepositCapUsage",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyWithdrawalCap",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyWithdrawalCapUsage",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyUserDepositCap",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyUserDepositCapUsage",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "depositCap",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ZkBobAccounting.Limits",
         "name": "",
-        "type": "uint256"
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "native_denominator",
-    "outputs": [
+    "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "_root",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_tvlCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dailyDepositCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dailyWithdrawalCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dailyUserDepositCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_depositCap",
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -166,6 +252,19 @@
   },
   {
     "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "pool_id",
     "outputs": [
       {
@@ -191,6 +290,13 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -210,16 +316,82 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_tvlCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dailyDepositCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dailyWithdrawalCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dailyUserDepositCap",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_depositCap",
+        "type": "uint256"
+      }
+    ],
+    "name": "setLimits",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract IOperatorManager",
+        "name": "_operatorManager",
+        "type": "address"
+      }
+    ],
+    "name": "setOperatorManager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "token",
     "outputs": [
       {
-        "internalType": "contract IERC20",
+        "internalType": "address",
         "name": "",
         "type": "address"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "transact",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -250,35 +422,9 @@
   },
   {
     "inputs": [],
-    "name": "voucher_token",
-    "outputs": [
-      {
-        "internalType": "contract IMintable",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "initialize",
+    "name": "withdrawFee",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "transact",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "payable",
     "type": "function"
   }
 ]
