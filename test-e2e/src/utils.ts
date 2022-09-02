@@ -87,9 +87,10 @@ export const fakeTxProof = {
 export function packSignature(sign: Sign) {
   const vBit = toBN(sign.v).isEven()
   const r = toBN(sign.r)
-  const s = toBN(sign.s)
-  if (vBit) s.iadd(toBN(2).pow(toBN(255)))
-  return '0x' + r.toString('hex') + s.toString('hex')
+  const vs = toBN(sign.s)
+  if (vBit) vs.iadd(toBN(2).pow(toBN(255)))
+  const sig = r.toString('hex') + vs.toString('hex')
+  return sig
 }
 
 export function addressToUint8(address: string) {

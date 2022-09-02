@@ -6,6 +6,7 @@ import { poolTxQueue } from './queue/poolTxQueue'
 import config from './config'
 import { proveTx } from './prover'
 import {
+  checkGetLimits,
   checkGetTransactions,
   checkGetTransactionsV2,
   checkSendTransactionErrors,
@@ -165,6 +166,20 @@ function getFee(req: Request, res: Response) {
   })
 }
 
+async function getLimits(req: Request, res: Response) {
+  const errors = checkGetLimits(req.query)
+  if (errors) {
+    logger.info('Request errors: %o', errors)
+    res.status(400).json({ errors })
+    return
+  }
+
+  const address = req.query.address as unknown as string
+  const limits = await pool.getLimitsFor(address)
+  const limitsFetch = pool.processLimits(limits)
+  res.json(limitsFetch)
+}
+
 export default {
   txProof,
   sendTransaction,
@@ -175,4 +190,5 @@ export default {
   getJob,
   relayerInfo,
   getFee,
+  getLimits,
 }

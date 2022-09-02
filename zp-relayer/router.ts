@@ -38,5 +38,6 @@ router.get('/merkle/root/:index?', wrapErr(endpoints.merkleRoot))
 router.get('/job/:id', wrapErr(endpoints.getJob))
 router.get('/info', wrapErr(endpoints.relayerInfo))
 router.get('/fee', wrapErr(endpoints.getFee))
+router.get('/limits', wrapErr(endpoints.getLimits))
 
 export default router
