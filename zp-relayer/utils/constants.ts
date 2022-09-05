@@ -10,6 +10,7 @@ const constants = {
   ENERGY_SIZE: 28,
   TOKEN_SIZE: 16,
   POOL_ID_SIZE: 6,
+  ZERO_ADDRESS: '0x0000000000000000000000000000000000000000',
 }
 
 export = constants

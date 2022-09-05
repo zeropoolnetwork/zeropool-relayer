@@ -12,7 +12,7 @@ import { sentTxQueue } from '../queue/sentTxQueue'
 import { processTx } from '../txProcessor'
 import config from '../config'
 import { redis } from '../services/redisClient'
-import { checkAssertion, checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
+import { checkAssertion, checkLimits, checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
 import type { EstimationType, GasPrice } from '../services/GasPrice'
 import type { Mutex } from 'async-mutex'
 import { getChainId } from '../utils/web3'
@@ -40,18 +40,9 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
       const outCommit = txProof.inputs[2]
       const delta = parseDelta(txProof.inputs[3])
 
-      await checkAssertion(
-        () => checkNullifier(nullifier, pool.state.nullifiers),
-        `Doublespend detected in confirmed state`
-      )
-      await checkAssertion(
-        () => checkNullifier(nullifier, pool.optimisticState.nullifiers),
-        `Doublespend detected in optimistic state`
-      )
-      await checkAssertion(
-        () => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex),
-        `Incorrect transfer index`
-      )
+      await checkAssertion(() => checkNullifier(nullifier, pool.state.nullifiers))
+      await checkAssertion(() => checkNullifier(nullifier, pool.optimisticState.nullifiers))
+      await checkAssertion(() => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex))
 
       const { data, commitIndex } = await processTx(job.id as string, tx, pool)
 

@@ -1,7 +1,7 @@
 import { redis } from './services/redisClient'
 
 export class NullifierSet {
-  constructor(private name: string) {}
+  constructor(public name: string) {}
 
   async add(nullifiers: string[]) {
     if (nullifiers.length === 0) return
