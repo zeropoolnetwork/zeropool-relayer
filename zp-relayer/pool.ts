@@ -206,7 +206,7 @@ class Pool {
       dailyDepositCap: toBN(limits.dailyDepositCap),
       dailyDepositCapUsage: toBN(limits.dailyDepositCapUsage),
       dailyWithdrawalCap: toBN(limits.dailyWithdrawalCap),
-      dailyWithdrawalCapUsage: toBN(limits.dailyUserDepositCapUsage),
+      dailyWithdrawalCapUsage: toBN(limits.dailyWithdrawalCapUsage),
       dailyUserDepositCap: toBN(limits.dailyUserDepositCap),
       dailyUserDepositCapUsage: toBN(limits.dailyUserDepositCapUsage),
       depositCap: toBN(limits.depositCap),

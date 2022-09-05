@@ -10,6 +10,7 @@ import TokenAbi from './abi/token-abi.json'
 import { web3 } from './services/web3'
 import { numToHex, unpackSignature } from './utils/helpers'
 import { recoverSaltedPermit } from './utils/EIP712SaltedPermit'
+import { ZERO_ADDRESS } from './utils/constants'
 
 const tokenContract = new web3.eth.Contract(TokenAbi as AbiItem[], config.tokenAddress)
 
@@ -22,13 +23,26 @@ export interface Delta {
   poolId: BN
 }
 
+type OptionError = Error | null
+export async function checkAssertion(f: () => Promise<OptionError> | OptionError) {
+  const err = await f()
+  if (err) {
+    logger.error('Assertion error: %s', err.message)
+    throw err
+  }
+}
+
 export function checkSize(data: string, size: number) {
   return data.length === size
 }
 
 export async function checkBalance(address: string, minBalance: string) {
   const balance = await tokenContract.methods.balanceOf(address).call()
-  return toBN(balance).gte(toBN(minBalance))
+  const res = toBN(balance).gte(toBN(minBalance))
+  if (!res) {
+    return new Error('Not enough balance for deposit')
+  }
+  return null
 }
 
 export function checkCommitment(treeProof: Proof, txProof: Proof) {
@@ -36,16 +50,22 @@ export function checkCommitment(treeProof: Proof, txProof: Proof) {
 }
 
 export function checkTxProof(txProof: Proof) {
-  return pool.verifyProof(txProof.proof, txProof.inputs)
+  const res = pool.verifyProof(txProof.proof, txProof.inputs)
+  if (!res) {
+    return new Error('Incorrect transfer proof')
+  }
+  return null
 }
 
 export async function checkNullifier(nullifier: string, nullifierSet: NullifierSet) {
   const inSet = await nullifierSet.isInSet(nullifier)
-  return inSet === 0
+  if (inSet === 0) return null
+  return new Error(`Doublespend detected in ${nullifierSet.name}`)
 }
 
 export function checkTransferIndex(contractPoolIndex: BN, transferIndex: BN) {
-  return transferIndex.lte(contractPoolIndex)
+  if (transferIndex.lte(contractPoolIndex)) return null
+  return new Error(`Incorrect transfer index`)
 }
 
 export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmount: BN, txData: TxData, msgValue: BN) {
@@ -66,7 +86,10 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
     isValid = tokenAmount.lte(ZERO) && energyAmount.lte(ZERO)
     isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
-  return isValid
+  if (!isValid) {
+    return new Error('Tx specific fields are incorrect')
+  }
+  return null
 }
 
 export function parseDelta(delta: string): Delta {
@@ -83,14 +106,17 @@ export function checkNativeAmount(nativeAmount: BN | null) {
   logger.debug(`Native amount: ${nativeAmount}`)
   // Check native amount (relayer faucet)
   if (nativeAmount && nativeAmount > config.maxFaucet) {
-    return false
+    return new Error('Native amount too high')
   }
-  return true
+  return null
 }
 
 export function checkFee(fee: BN) {
   logger.debug(`Fee: ${fee}`)
-  return fee >= config.relayerFee
+  if (fee.lt(config.relayerFee)) {
+    return new Error('Fee too low')
+  }
+  return null
 }
 
 export function checkDeadline(deadline: BN) {
@@ -98,17 +124,31 @@ export function checkDeadline(deadline: BN) {
   // Check native amount (relayer faucet)
   const currentTimestamp = new BN(Math.floor(Date.now() / 1000))
   if (deadline <= currentTimestamp) {
-    return false
+    return new Error(`Deadline is expired`)
   }
-  return true
+  return null
 }
 
-export async function checkAssertion(f: Function, errStr: string) {
-  const res = await f()
-  if (!res) {
-    logger.error('Assertion error: %s', errStr)
-    throw new Error(errStr)
+export function checkLimits(limits: Limits, amount: BN) {
+  if (amount.gt(toBN(0))) {
+    if (amount.gt(limits.depositCap)) {
+      return new Error('Single deposit cap exceeded')
+    }
+    if (limits.tvl.add(amount).gte(limits.tvlCap)) {
+      return new Error('Tvl cap exceeded')
+    }
+    if (limits.dailyUserDepositCapUsage.add(amount).gt(limits.dailyUserDepositCap)) {
+      return new Error('Daily user deposit cap exceeded')
+    }
+    if (limits.dailyDepositCapUsage.add(amount).gt(limits.dailyDepositCap)) {
+      return new Error('Daily deposit cap exceeded')
+    }
+  } else {
+    if (limits.dailyWithdrawalCapUsage.sub(amount).gt(limits.dailyWithdrawalCap)) {
+      return new Error('Daily withdrawal cap exceeded')
+    }
   }
+  return null
 }
 
 async function checkDepositEnoughBalance(address: string, requiredTokenAmount: BN) {
@@ -127,7 +167,10 @@ async function getRecoveredAddress(
   depositSignature: string | null
 ) {
   // Signature without `0x` prefix, size is 64*2=128
-  await checkAssertion(() => depositSignature !== null && checkSize(depositSignature, 128), 'Invalid deposit signature')
+  await checkAssertion(() => {
+    if (depositSignature !== null && checkSize(depositSignature, 128)) return null
+    return new Error('Invalid deposit signature')
+  })
   const nullifier = '0x' + numToHex(toBN(proofNullifier))
   const sig = unpackSignature(depositSignature as string)
 
@@ -150,7 +193,7 @@ async function getRecoveredAddress(
     }
     recoveredAddress = recoverSaltedPermit(message, sig)
 
-    await checkAssertion(() => checkDeadline(deadline), `Deadline is expired`)
+    await checkAssertion(() => checkDeadline(deadline))
   } else {
     throw new Error('Unsupported txtype')
   }
@@ -162,35 +205,27 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
   const buf = Buffer.from(memo, 'hex')
   const txData = getTxData(buf, txType)
 
-  await checkAssertion(() => checkFee(txData.fee), 'Fee too low')
+  await checkAssertion(() => checkFee(txData.fee))
 
   if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
-    await checkAssertion(() => checkNativeAmount(nativeAmount), 'Native amount too high')
+    await checkAssertion(() => checkNativeAmount(nativeAmount))
   }
 
-  await checkAssertion(() => checkTxProof(proof), 'Incorrect transfer proof')
+  await checkAssertion(() => checkTxProof(proof))
 
   const delta = parseDelta(proof.inputs[3])
 
   const tokenAmountWithFee = delta.tokenAmount.add(txData.fee)
-  await checkAssertion(
-    () => checkTxSpecificFields(txType, tokenAmountWithFee, delta.energyAmount, txData, toBN('0')),
-    'Tx specific fields are incorrect'
-  )
+  await checkAssertion(() => checkTxSpecificFields(txType, tokenAmountWithFee, delta.energyAmount, txData, toBN('0')))
 
   const requiredTokenAmount = tokenAmountWithFee.mul(pool.denominator)
+  let userAddress = ZERO_ADDRESS
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-    const recoveredAddress = await getRecoveredAddress(
-      txType,
-      proof.inputs[1],
-      txData,
-      requiredTokenAmount,
-      depositSignature
-    )
-    await checkAssertion(
-      () => checkDepositEnoughBalance(recoveredAddress, requiredTokenAmount),
-      'Not enough balance for deposit'
-    )
+    userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, depositSignature)
+    await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
   }
+
+  const limits = await pool.getLimitsFor(userAddress)
+  await checkAssertion(() => checkLimits(limits, tokenAmountWithFee))
 }

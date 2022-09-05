@@ -29,12 +29,14 @@ RUN yarn build:relayer
 
 FROM node:16
 
-WORKDIR /app/zp-relayer
+WORKDIR /app
 
-COPY --from=build /app/zp-relayer/build ./
-COPY --from=build /app/zp-relayer/package.json ./
+COPY --from=build /app/zp-relayer/build ./zp-relayer
+COPY --from=build /app/zp-relayer/package.json ./zp-relayer
+COPY --from=build /app/zp-relayer/node_modules ./zp-relayer/node_modules
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/zp-memo-parser ./node_modules/zp-memo-parser
 
+WORKDIR /app/zp-relayer
 ENV NODE_ENV=production
 CMD yarn run start:prod
