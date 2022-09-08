@@ -180,6 +180,10 @@ async function getLimits(req: Request, res: Response) {
   res.json(limitsFetch)
 }
 
+function root(req: Request, res: Response) {
+  return res.sendStatus(200)
+}
+
 export default {
   txProof,
   sendTransaction,
@@ -191,4 +195,5 @@ export default {
   relayerInfo,
   getFee,
   getLimits,
+  root,
 }
