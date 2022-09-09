@@ -226,6 +226,6 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
     await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
   }
 
-  const limits = await pool.getLimitsFor(userAddress)
-  await checkAssertion(() => checkLimits(limits, tokenAmountWithFee))
+  // const limits = await pool.getLimitsFor(userAddress)
+  // await checkAssertion(() => checkLimits(limits, tokenAmountWithFee))
 }

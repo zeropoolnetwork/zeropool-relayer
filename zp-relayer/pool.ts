@@ -199,17 +199,19 @@ class Pool {
   }
 
   async getLimitsFor(address: string): Promise<Limits> {
-    const limits = await this.PoolInstance.methods.getLimitsFor(address).call()
+    // const limits = await this.PoolInstance.methods.getLimitsFor(address).call()
+    const MAX_LIMIT = toBN(2).pow(toBN(128)).sub(toBN(1))
+
     return {
-      tvlCap: toBN(limits.tvlCap),
-      tvl: toBN(limits.tvl),
-      dailyDepositCap: toBN(limits.dailyDepositCap),
-      dailyDepositCapUsage: toBN(limits.dailyDepositCapUsage),
-      dailyWithdrawalCap: toBN(limits.dailyWithdrawalCap),
-      dailyWithdrawalCapUsage: toBN(limits.dailyWithdrawalCapUsage),
-      dailyUserDepositCap: toBN(limits.dailyUserDepositCap),
-      dailyUserDepositCapUsage: toBN(limits.dailyUserDepositCapUsage),
-      depositCap: toBN(limits.depositCap),
+      tvlCap: MAX_LIMIT,
+      tvl: MAX_LIMIT,
+      dailyDepositCap: MAX_LIMIT,
+      dailyDepositCapUsage: MAX_LIMIT,
+      dailyWithdrawalCap: MAX_LIMIT,
+      dailyWithdrawalCapUsage: MAX_LIMIT,
+      dailyUserDepositCap: MAX_LIMIT,
+      dailyUserDepositCapUsage: MAX_LIMIT,
+      depositCap: MAX_LIMIT,
     }
   }
 
