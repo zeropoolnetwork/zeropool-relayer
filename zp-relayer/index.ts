@@ -12,6 +12,10 @@ app.use(createLoggerMiddleware('zp.log'))
 
 app.use(router)
 
+app.use(function jsonErrorHandler(error: any, req: any, res: any, next: any) {
+  res.status(500).send({ error });
+})
+
 init().then(() => {
   const PORT = config.port
   app.listen(PORT, () => logger.info(`Started relayer on port ${PORT}`))
