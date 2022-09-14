@@ -12,6 +12,9 @@ import {
   checkSendTransactionErrors,
   checkSendTransactionsErrors,
 } from './validation/validation'
+import { connect, Contract, KeyPair, keyStores, WalletConnection } from 'near-api-js';
+import connectPg from 'pg-promise';
+
 
 const txProof = (() => {
   let txProofNum = 0
@@ -180,6 +183,31 @@ async function getLimits(req: Request, res: Response) {
   res.json(limitsFetch)
 }
 
+async function getBlockchainTransaction(req: Request, res: Response) {
+  if (config.chain !== 'near') {
+    res.status(400).json({ error: `${config.chain} is not supported` })
+    return
+  }
+
+  const hash = req.params.hash
+  const indexer = connectPg()(config.nearIndexerUrl!)
+  const tx: any[] = await indexer.any(`
+    SELECT tx.transaction_hash, tx.block_timestamp, tx.receiver_account_id, tx.signature, a.args
+      FROM transactions AS tx
+      JOIN transaction_actions AS a ON tx.transaction_hash = a.transaction_hash
+      WHERE tx.transaction_hash = $2 AND a.action_kind = 'FUNCTION_CALL'
+  `, [config.poolAddress, hash])
+
+  let result: any = null
+  if (tx[0] && tx[0].args.method_name == 'transact') {
+    result = tx[0]
+    result.args_parsed = JSON.parse(Buffer.from(result.args.args_base64, 'base64').toString('utf8'))
+
+  }
+
+  res.json(result)
+}
+
 function root(req: Request, res: Response) {
   return res.sendStatus(200)
 }
@@ -195,5 +223,6 @@ export default {
   relayerInfo,
   getFee,
   getLimits,
+  getBlockchainTransaction,
   root,
 }

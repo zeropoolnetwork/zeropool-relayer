@@ -9,7 +9,7 @@ import { logger } from '../services/appLogger'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from '../utils/redisFields'
 import { MessageEvent, Chain, TxStatus, PoolCalldata } from './chain';
 import { Pool } from '../pool';
-import { TxPayload } from '../services/poolTxQueue';
+import { TxPayload } from '../queue/poolTxQueue';
 
 // const topic = blake2AsHex('ZeropoolMessage')
 

@@ -40,5 +40,6 @@ router.get('/job/:id', wrapErr(endpoints.getJob))
 router.get('/info', wrapErr(endpoints.relayerInfo))
 router.get('/fee', wrapErr(endpoints.getFee))
 router.get('/limits', wrapErr(endpoints.getLimits))
+router.get('/blockchain/tx/:hash', wrapErr(endpoints.getBlockchainTransaction))
 
 export default router

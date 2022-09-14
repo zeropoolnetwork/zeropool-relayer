@@ -1,4 +1,4 @@
-import { connect, keyStores, KeyPair, WalletConnection, Near, Contract } from 'near-api-js'
+import { connect, keyStores, KeyPair, WalletConnection, Near, Contract, DEFAULT_FUNCTION_CALL_GAS } from 'near-api-js'
 import { FinalExecutionStatusBasic } from 'near-api-js/lib/providers'
 import connectPg from 'pg-promise'
 import borsh from 'borsh'
@@ -9,7 +9,7 @@ import { Chain, MessageEvent, TxStatus, PoolCalldata } from './chain'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from '../utils/redisFields'
 import config from '../config'
 import { logger } from '../services/appLogger'
-import { TxPayload } from '../services/poolTxQueue'
+import { TxPayload } from '../queue/poolTxQueue'
 import { Pool } from '../pool'
 import { parseDelta } from '../validateTx'
 import { Proof, SnarkProof } from 'libzkbob-rs-node'
@@ -27,7 +27,7 @@ const BORSH_SCHEMA = new Map([[
       ['tokenAmount', 'u256'],
       ['delta', 'u256'],
 
-      ['transactionProof', ['u256', 8]],
+      ['transactProof', ['u256', 8]],
       ['rootAfter', 'u256'],
       ['treeProof', ['u256', 8]],
 
@@ -56,7 +56,7 @@ export class NearChain implements Chain {
 
     const logPrefix = `Job ${id}:`
 
-    logger.info(`${logPrefix} Recieved ${txType} tx with ${amount} native amount`)
+    logger.info(`${logPrefix} Received ${txType} tx with ${amount} native amount`)
 
     const delta = parseDelta(txProof.inputs[3])
 
@@ -115,7 +115,7 @@ export class NearChain implements Chain {
     this.near = nearConnection
     this.walletConnection = new WalletConnection(nearConnection, null)
     this.poolContract = new Contract(this.walletConnection.account(), config.poolAddress!, {
-      changeMethods: ['transact', 'reserve', 'release'],
+      changeMethods: ['transact', 'lock', 'release'],
       viewMethods: ['pool_index'],
     })
     const pgConn = connectPg()
@@ -153,9 +153,10 @@ export class NearChain implements Chain {
 
       const events: MessageEvent[] = txs.reduce(async (acc, tx: any) => {
         if (tx.args.method_name === 'transact') {
+          const args = JSON.parse(Buffer.from(tx.args.args_base64, 'base64').toString('utf8'))
           acc.push({
             transactionHash: tx.transactionHash,
-            data: tx.args.args_base64,
+            data: args.encoded_tx,
           })
         }
 
@@ -187,8 +188,8 @@ export class NearChain implements Chain {
   async signAndSend(txConfig: { data: string, nonce: string, gas: string, amount: string }): Promise<string> {
     // @ts-ignore
     return await this.poolContract.transact({
-      args: txConfig.data,
-    });
+      encoded_tx: txConfig.data,
+    }, DEFAULT_FUNCTION_CALL_GAS);
   }
 
   async getDenominator(): Promise<string> {

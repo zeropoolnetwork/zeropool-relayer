@@ -1,6 +1,6 @@
 import { TxType } from 'zp-memo-parser'
 import BN from 'bn.js'
-import type { TxPayload } from '../services/poolTxQueue';
+import type { TxPayload } from '../queue/poolTxQueue';
 import type { Pool } from '../pool';
 
 export type MessageEvent = { data: string, transactionHash: string }
