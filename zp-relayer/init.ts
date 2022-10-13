@@ -9,15 +9,14 @@ import { createSentTxWorker } from './workers/sentTxWorker'
 import { initializeDomain } from './utils/EIP712SaltedPermit'
 
 export async function init() {
-  await initializeDomain(web3)
-
-  await initPool()
-
   let gasPriceService = null
   if (config.chain == 'evm') {
+    await initializeDomain(web3)
     gasPriceService = new GasPrice(web3, config.gasPriceUpdateInterval, config.gasPriceEstimationType, {})
     await gasPriceService.start()
   }
+
+  await initPool()
 
   const workerMutex = new Mutex();
   const poolTxWorker = await createPoolTxWorker(workerMutex, gasPriceService)

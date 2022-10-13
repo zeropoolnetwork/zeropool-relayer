@@ -3,9 +3,12 @@ import Web3 from 'web3'
 import { toBN } from 'web3-utils'
 import type { EstimationType } from './services/GasPrice'
 
-const relayerAddress = new Web3().eth.accounts.privateKeyToAccount(
-  process.env.RELAYER_ADDRESS_PRIVATE_KEY as string
-).address
+let relayerAddress = ''
+if (process.env.RELAYER_CHAIN == 'evm') {
+  relayerAddress = new Web3().eth.accounts.privateKeyToAccount(
+    process.env.RELAYER_ADDRESS_PRIVATE_KEY as string
+  ).address
+}
 
 const config = {
   port: parseInt(process.env.PORT || '8000'),

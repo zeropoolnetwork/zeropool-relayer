@@ -51,6 +51,13 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
+"@dao-xyz/borsh@^3.2.5":
+  version "3.2.5"
+  resolved "https://registry.yarnpkg.com/@dao-xyz/borsh/-/borsh-3.2.5.tgz#242158271b23b7ca8043299edad0abb6e963cd24"
+  integrity sha512-+Prm3uWl5iSMcnVif/4ikOoWXAcxUgKl01qGjItzLmxlOWIeAkobwae0UNnxJvFozMe/1uDDuTq2Xgi09DUY6Q==
+  dependencies:
+    text-encoding-utf-8 "^1.0.2"
+
 "@discoveryjs/json-ext@^0.5.0":
   version "0.5.5"
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.5.tgz#9283c9ce5b289a3c4f61c12757469e59377f81f3"
@@ -1426,19 +1433,19 @@ body-parser@1.19.0, body-parser@^1.16.0:
     raw-body "2.4.0"
     type-is "~1.6.17"
 
-borsh@^0.5.0:
-  version "0.5.0"
-  resolved "https://registry.yarnpkg.com/borsh/-/borsh-0.5.0.tgz#d5eed021a34118908d672295819e3c9e44f692ce"
-  integrity sha512-p9w/qGBeeFdUf2GPBPHdX5JQyez8K5VtoFN7PqSfmR+cVUMSmcwAKhP9n2aXoDSKbtS7xZlZt3MVnrJL7GdYhg==
+borsh@0.7, borsh@^0.7.0:
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/borsh/-/borsh-0.7.0.tgz#6e9560d719d86d90dc589bca60ffc8a6c51fec2a"
+  integrity sha512-CLCsZGIBCFnPtkNnieW/a8wmreDmfUtjU2m9yHrzPXIlNbqVs0AQrSatSG6vdNYUqdc83tkQi2eHfF98ubzQLA==
   dependencies:
     bn.js "^5.2.0"
     bs58 "^4.0.0"
     text-encoding-utf-8 "^1.0.2"
 
-borsh@^0.7.0:
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/borsh/-/borsh-0.7.0.tgz#6e9560d719d86d90dc589bca60ffc8a6c51fec2a"
-  integrity sha512-CLCsZGIBCFnPtkNnieW/a8wmreDmfUtjU2m9yHrzPXIlNbqVs0AQrSatSG6vdNYUqdc83tkQi2eHfF98ubzQLA==
+borsh@^0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/borsh/-/borsh-0.5.0.tgz#d5eed021a34118908d672295819e3c9e44f692ce"
+  integrity sha512-p9w/qGBeeFdUf2GPBPHdX5JQyez8K5VtoFN7PqSfmR+cVUMSmcwAKhP9n2aXoDSKbtS7xZlZt3MVnrJL7GdYhg==
   dependencies:
     bn.js "^5.2.0"
     bs58 "^4.0.0"
@@ -7272,7 +7279,7 @@ yocto-queue@^0.1.0:
 "zp-memo-parser@link:zp-memo-parser":
   version "0.0.3"
   dependencies:
-    borsh "^0.5.0"
+    borsh "0.7"
     buffer "^6.0.3"
     stream-http "^3.2.0"
     web3 "1.7.4"

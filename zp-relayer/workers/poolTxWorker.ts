@@ -111,7 +111,10 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
     return txHashes
   }
 
-  await updateField(RelayerKeys.NONCE, await readNonce(true))
+  if (config.chain !== 'near') {
+    await updateField(RelayerKeys.NONCE, await readNonce(true))
+  }
+
   const poolTxWorker = new Worker<TxPayload[]>(
     TX_QUEUE_NAME,
     job => withMutex(mutex, () => poolTxWorkerProcessor(job)),

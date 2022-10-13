@@ -12,7 +12,8 @@ import { numToHex, unpackSignature } from './utils/helpers'
 import { recoverSaltedPermit } from './utils/EIP712SaltedPermit'
 import { ZERO_ADDRESS } from './utils/constants'
 
-const tokenContract = new web3.eth.Contract(TokenAbi as AbiItem[], config.tokenAddress)
+// const tokenContract = new web3.eth.Contract(TokenAbi as AbiItem[], config.tokenAddress)
+let tokenContract: any
 
 const ZERO = toBN(0)
 
@@ -221,7 +222,7 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
 
   const requiredTokenAmount = tokenAmountWithFee.mul(pool.denominator)
   let userAddress = ZERO_ADDRESS
-  if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
+  if (config.chain === 'evm' && (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT)) {
     userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, depositSignature)
     await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
   }

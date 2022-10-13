@@ -49,12 +49,13 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 
   const rawTxs = req.body
   const txs = rawTxs.map((tx: any) => {
-    const { proof, memo, txType, depositSignature } = tx
+    const { proof, memo, txType, depositSignature, fromAddress } = tx
     return {
       proof,
       memo,
       txType,
       depositSignature,
+      fromAddress,
     }
   })
   const jobId = await pool.transact(txs)
@@ -69,8 +70,8 @@ async function sendTransaction(req: Request, res: Response, next: NextFunction) 
     return
   }
 
-  const { proof, memo, txType, depositSignature } = req.body
-  const tx = [{ proof, memo, txType, depositSignature }]
+  const { proof, memo, txType, depositSignature, depositId, fromAddress } = req.body
+  const tx = [{ proof, memo, txType, depositSignature, depositId, fromAddress }]
   const jobId = await pool.transact(tx)
   res.json({ jobId })
 }
@@ -191,21 +192,29 @@ async function getBlockchainTransaction(req: Request, res: Response) {
 
   const hash = req.params.hash
   const indexer = connectPg()(config.nearIndexerUrl!)
-  const tx: any[] = await indexer.any(`
-    SELECT tx.transaction_hash, tx.block_timestamp, tx.receiver_account_id, tx.signature, a.args
-      FROM transactions AS tx
-      JOIN transaction_actions AS a ON tx.transaction_hash = a.transaction_hash
-      WHERE tx.transaction_hash = $2 AND a.action_kind = 'FUNCTION_CALL'
-  `, [config.poolAddress, hash])
+
+  let tx: any[]
+  do {
+    try {
+      tx = await indexer.any(`
+        SELECT tx.transaction_hash, tx.block_timestamp, tx.receiver_account_id, tx.signature, a.args
+          FROM transactions AS tx
+          JOIN transaction_actions AS a ON tx.transaction_hash = a.transaction_hash
+          WHERE tx.transaction_hash = $2 AND a.action_kind = 'FUNCTION_CALL'
+      `, [config.poolAddress, hash])
+    } catch (err) {
+      logger.warn('Failed to fetch transaction from near indexer, retrying in 1 second...', err)
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+  } while (!tx!)
 
   let result: any = null
   if (tx[0] && tx[0].args.method_name == 'transact') {
     result = tx[0]
-    result.args_parsed = JSON.parse(Buffer.from(result.args.args_base64, 'base64').toString('utf8'))
-
+    res.json(result)
+  } else {
+    res.status(404).json({ error: 'Transaction not found' })
   }
-
-  res.json(result)
 }
 
 function root(req: Request, res: Response) {

@@ -26,6 +26,8 @@ export interface PoolTx {
   memo: string
   txType: TxType
   depositSignature: string | null
+  depositId: number | null
+  fromAddress: string | null
 }
 
 export interface Limits {
@@ -75,18 +77,16 @@ class Pool {
 
   constructor(chain: Chain) {
     this.treeParams = Params.fromFile(config.treeUpdateParamsPath)
-    const txVK = require(config.txVKPath)
-    this.txVK = txVK
+    this.txVK = require(config.txVKPath)
 
-    this.state = new PoolState(`${config.storagePrefix}.pool`)
-    this.optimisticState = new PoolState(`${config.storagePrefix}.optimistic`)
+    this.state = new PoolState(`${config.storagePrefix || config.chain}.${config.tokenAddress}.pool`)
+    this.optimisticState = new PoolState(`${config.storagePrefix || config.chain}.${config.tokenAddress}.optimistic`)
     this.chain = chain
   }
 
   async init() {
     if (this.isInitialized) return
 
-    this.chain.init()
     this.denominator = toBN(await this.chain.getDenominator())
     await this.syncState()
     this.isInitialized = true
@@ -97,7 +97,7 @@ class Pool {
       await validateTx(tx)
     }
 
-    const queueTxs = txs.map(({ proof, txType, memo, depositSignature }) => {
+    const queueTxs = txs.map(({ proof, txType, memo, depositSignature, depositId, fromAddress }) => {
       return {
         amount: '0',
         gas: config.relayerGasLimit.toString(),
@@ -105,6 +105,8 @@ class Pool {
         txType,
         rawMemo: memo,
         depositSignature,
+        depositId,
+        fromAddress,
       }
     })
     const job = await poolTxQueue.add('tx', queueTxs)
@@ -254,8 +256,10 @@ export async function initPool() {
     default: throw new Error(`Uknown chain '${config.chain}'`)
   }
 
+  await chain.init()
+
   pool = new Pool(chain)
-  pool.init()
+  await pool.init()
 }
 
 export type { Pool }

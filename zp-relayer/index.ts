@@ -13,6 +13,7 @@ app.use(createLoggerMiddleware('zp.log'))
 app.use(router)
 
 app.use(function jsonErrorHandler(error: any, req: any, res: any, next: any) {
+  console.error(error)
   res.status(500).send({ error });
 })
 

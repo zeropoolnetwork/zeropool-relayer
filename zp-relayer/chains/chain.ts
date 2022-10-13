@@ -32,6 +32,7 @@ export class PoolCalldata {
   outCommit!: BN
   transferIndex!: BN
   energyAmount!: BN
+  tokenId!: string
   tokenAmount!: BN
   delta!: BN
   transactProof!: BN[]
@@ -40,4 +41,5 @@ export class PoolCalldata {
   txType!: number
   memo!: Uint8Array
   depositAddress!: string
+  depositId!: number
 }
