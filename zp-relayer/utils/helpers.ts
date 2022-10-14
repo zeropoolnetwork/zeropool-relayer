@@ -8,6 +8,15 @@ import type { Mutex } from 'async-mutex'
 const S_MASK = toBN('0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
 const S_MAX = toBN('0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0')
 
+type OptionError = Error | null
+export async function checkAssertion(f: () => Promise<OptionError> | OptionError) {
+  const err = await f()
+  if (err) {
+    logger.error('Assertion error: %s', err.message)
+    throw err
+  }
+}
+
 export function toTxType(t: string): TxType {
   t = truncateHexPrefix(t)
   if (t === TxType.DEPOSIT || t === TxType.TRANSFER || t === TxType.WITHDRAWAL || t === TxType.PERMITTABLE_DEPOSIT) {

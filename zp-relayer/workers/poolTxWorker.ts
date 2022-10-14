@@ -10,7 +10,8 @@ import { numToHex, truncateMemoTxPrefix, withMutex } from '../utils/helpers'
 import { pool } from '../pool'
 import config from '../config'
 import { redis } from '../services/redisClient'
-import { checkAssertion, checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
+import { checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
+import { checkAssertion } from '../utils/helpers'
 import type { EstimationType, GasPrice } from '../services/GasPrice'
 import { getChainId } from '../utils/web3'
 import { TxPayload } from '../queue/poolTxQueue'
@@ -24,6 +25,7 @@ const WORKER_OPTIONS = {
 
 export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex, gasPrice: GasPrice<T> | null) {
   let chainId = 0
+  // chainId is only relevant for EVM based chains
   if (config.chain == 'evm') {
     chainId = await getChainId(web3)
   }
@@ -57,15 +59,16 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
         gasPriceOptions = gasPrice.getPrice()
       }
 
-      // const txConfig = {
-      //   data,
-      //   nonce,
-      //   value: toWei(toBN(amount)),
-      //   gas,
-      //   to: config.poolAddress,
-      //   chainId: chainId,
-      //   ...gasPriceOptions,
-      // }
+      const txConfig = {
+        data,
+        nonce,
+        value: pool.chain.toBaseUnit(toBN(amount)),
+        gas,
+        to: config.poolAddress,
+        chainId: chainId,
+        ...gasPriceOptions,
+      }
+
       try {
         const txHash = await pool.chain.signAndSend({ data, nonce, gas, amount })
         logger.debug(`${logPrefix} TX hash ${txHash}`)
@@ -90,7 +93,7 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
             txHash,
             txData,
             nullifier,
-            txConfig: {},
+            txConfig,
           },
           {
             delay: config.sentTxDelay,

@@ -18,23 +18,26 @@ const {
   RELAYER_ADDRESS_PRIVATE_KEY,
 } = process.env as { [key: PropertyKey]: string }
 
-export class PolkadotChain implements Chain {
+export class PolkadotChain extends Chain {
+  toBaseUnit(amount: import("bn.js")): import("bn.js") {
+      throw new Error('Method not implemented.');
+  }
+  fromBaseUnit(amount: import("bn.js")): import("bn.js") {
+      throw new Error('Method not implemented.');
+  }
   processTx(id: string, tx: TxPayload, pool: Pool): Promise<{ data: string; commitIndex: number; }> {
     throw new Error('Method not implemented.');
   }
   parseCalldata(tx: string): PoolCalldata {
     throw new Error('Method not implemented.');
   }
-  init(): Promise<void> {
+  static async create(): Promise<PolkadotChain> {
     throw new Error('Method not implemented.');
   }
   getTxStatus(txId: any): Promise<{ status: TxStatus; blockId?: any; }> {
     throw new Error('Method not implemented.');
   }
   signAndSend(txConfig: any): Promise<string> {
-    throw new Error('Method not implemented.');
-  }
-  getDenominator(): Promise<string> {
     throw new Error('Method not implemented.');
   }
   async getNewEvents(): Promise<MessageEvent[]> {

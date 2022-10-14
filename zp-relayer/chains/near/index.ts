@@ -4,11 +4,9 @@ import {
   KeyPair,
   Near,
   Contract,
-  DEFAULT_FUNCTION_CALL_GAS,
   Account
 } from 'near-api-js'
 import { FinalExecutionStatusBasic } from 'near-api-js/lib/providers'
-import connectPg from 'pg-promise'
 import { BinaryWriter, BinaryReader } from '../../utils/binary'
 import BN from 'bn.js'
 import { TxType } from 'zp-memo-parser'
@@ -16,7 +14,6 @@ import { Proof, SnarkProof } from 'libzkbob-rs-node'
 
 import { Chain, MessageEvent, TxStatus, PoolCalldata } from '../chain'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from '../../utils/redisFields'
-import config from '../../config'
 import { logger } from '../../services/appLogger'
 import { TxPayload } from '../../queue/poolTxQueue'
 import { Pool } from '../../pool'
@@ -68,20 +65,20 @@ function serializePoolData(data: PoolCalldata): Buffer {
 function deserializePoolData(data: Buffer): PoolCalldata {
   const reader = new BinaryReader(data)
 
-  let nullifier = reader.readU256()
-  let outCommit = reader.readU256()
-  let transferIndex = reader.readU256()
-  let energyAmount = reader.readU256()
-  let tokenId = reader.readString()
-  let tokenAmount = reader.readU256()
-  let delta = reader.readU256()
-  let transactProof = reader.readFixedArray(8, () => reader.readU256())
-  let rootAfter = reader.readU256()
-  let treeProof = reader.readFixedArray(8, () => reader.readU256())
-  let txType = reader.readU8()
-  let memo = reader.readDynamicBuffer()
-  let depositAddress = reader.readString()
-  let depositId = reader.readU64()
+  const nullifier = reader.readU256()
+  const outCommit = reader.readU256()
+  const transferIndex = reader.readU256()
+  const energyAmount = reader.readU256()
+  const tokenId = reader.readString()
+  const tokenAmount = reader.readU256()
+  const delta = reader.readU256()
+  const transactProof = reader.readFixedArray(8, () => reader.readU256())
+  const rootAfter = reader.readU256()
+  const treeProof = reader.readFixedArray(8, () => reader.readU256())
+  const txType = reader.readU8()
+  const memo = reader.readDynamicBuffer()
+  const depositAddress = reader.readString()
+  const depositId = reader.readU64()
 
   return new PoolCalldata({
     nullifier,
@@ -101,32 +98,48 @@ function deserializePoolData(data: Buffer): PoolCalldata {
   })
 }
 
-export class NearChain implements Chain {
+export interface NearConfig {
+  networkId: string
+  nodeUrl: string
+  relayerAccountId: string
+  relayerAccountPrivateKey: string
+  poolContractId: string
+  indexerUrl: string
+  tokenId: string
+}
+
+export class NearChain extends Chain {
   near: Near = null!
   account: Account = null!
-  poolContract: Contract = null!
   indexer: NearIndexerApi = null!
+  config: NearConfig = null!
 
-  async init(): Promise<void> {
+  static async create(config: NearConfig): Promise<NearChain> {
+    const self = new NearChain();
+
+    self.config = config
+
     const keyStore = new keyStores.InMemoryKeyStore()
-    const keyPair = KeyPair.fromString(config.relayerPrivateKey)
-    await keyStore.setKey(config.nearNetworkId!, config.nearAccountName!, keyPair)
+    const keyPair = KeyPair.fromString(config.relayerAccountPrivateKey)
+    await keyStore.setKey(config.networkId, config.relayerAccountId!, keyPair)
 
     const connectionConfig = {
-      networkId: config.nearNetworkId!,
-      nodeUrl: config.nearNodeUrl!,
-      walletUrl: config.nearWalletUrl!,
+      networkId: config.networkId,
+      nodeUrl: config.nodeUrl,
       keyStore,
     }
 
-    this.near = await connect(connectionConfig)
-    this.account = await this.near.account(config.nearAccountName!)
-    this.poolContract = new Contract(this.account, config.poolAddress!, {
-      changeMethods: ['transact', 'lock', 'release'],
-      viewMethods: ['pool_index', 'merkle_root'],
-    })
+    self.near = await connect(connectionConfig)
+    self.account = await self.near.account(config.relayerAccountId)
+    // this.poolContract = new Contract(this.account, config.poolContractId, {
+    //   changeMethods: ['transact', 'lock', 'release'],
+    //   viewMethods: ['pool_index', 'merkle_root'],
+    // })
 
-    this.indexer = await NearIndexerApi.create(config.nearIndexerUrl!, config.poolAddress!)
+    self.indexer = await NearIndexerApi.create(config.indexerUrl, config.poolContractId)
+    self.denominator = new BN('1000000000000000')
+
+    return self
   }
 
   public async processTx(id: string, tx: TxPayload, pool: Pool): Promise<{ data: string; commitIndex: number }> {
@@ -158,7 +171,7 @@ export class NearChain implements Chain {
       outCommit: new BN(treeProof.inputs[2]),
       transferIndex: delta.transferIndex,
       energyAmount: delta.energyAmount,
-      tokenId: config.tokenAddress!,
+      tokenId: this.config.tokenId,
       tokenAmount: delta.tokenAmount,
       delta: new BN(txProof.inputs[3]),
       transactProof: flattenProof(txProof.proof),
@@ -222,23 +235,19 @@ export class NearChain implements Chain {
   }
 
   async getContractTransferNum(): Promise<string> {
-    // @ts-ignore
     return await this.account.viewFunction({
-      contractId: config.poolAddress!,
+      contractId: this.config.poolContractId,
       methodName: 'pool_index',
       args: {},
       parse: (val: Uint8Array) => deserializeU256(Buffer.from(val)).toString(),
       stringify: (_: any) => new Buffer(0),
     })
-    // const value = await this.poolContract.pool_index()
-    // return deserializeU256(value).toString()
   }
 
   async getContractMerkleRoot(index: string | null | undefined): Promise<string> {
     const arg = serializeU256(new BN(index || '0'))
-    // @ts-ignore
     return await this.account.viewFunction({
-      contractId: config.poolAddress!,
+      contractId: this.config.poolContractId,
       methodName: 'merkle_root',
       args: arg,
       parse: (val: Uint8Array) => {
@@ -250,7 +259,7 @@ export class NearChain implements Chain {
 
   async signAndSend(txConfig: { data: string, nonce: string, gas: string, amount: string }): Promise<string> {
     const res = await this.account.functionCall({
-      contractId: config.poolAddress!,
+      contractId: this.config.poolContractId,
       methodName: 'transact',
       gas: MAX_GAS,
       args: Buffer.from(txConfig.data, 'base64'),
@@ -264,8 +273,12 @@ export class NearChain implements Chain {
     return txo.id
   }
 
-  async getDenominator(): Promise<string> {
-    return '1000000000000000' // TODO
+  toBaseUnit(amount: BN): BN {
+    throw new Error('Method not implemented.')
+  }
+
+  fromBaseUnit(amount: BN): BN {
+    throw new Error('Method not implemented.')
   }
 }
 

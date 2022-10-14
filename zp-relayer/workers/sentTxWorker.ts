@@ -1,5 +1,4 @@
 import { Job, Queue, Worker } from 'bullmq'
-import { web3 } from '../services/web3'
 import { logger } from '../services/appLogger'
 import { SENT_TX_QUEUE_NAME } from '../utils/constants'
 import { pool } from '../pool'

@@ -1,15 +1,14 @@
 import Contract from 'web3-eth-contract'
-import PoolAbi from './abi/pool-abi.json'
+import PoolAbi from './pool-abi.json'
 import { AbiItem, toBN } from 'web3-utils'
-import { logger } from './services/appLogger'
-import { TxPayload } from './queue/poolTxQueue'
-import { TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE } from './utils/constants'
-import { numToHex, flattenProof, truncateHexPrefix } from './utils/helpers'
+import { logger } from '../../services/appLogger'
+import { TxPayload } from '../../queue/poolTxQueue'
+import { TRANSFER_INDEX_SIZE, ENERGY_SIZE, TOKEN_SIZE } from '../../utils/constants'
+import { numToHex, flattenProof, truncateHexPrefix } from '../../utils/helpers'
 import { SnarkProof, Proof } from 'libzkbob-rs-node'
 import { TxType } from 'zp-memo-parser'
-import type { Pool } from './pool'
-
-import { Delta, parseDelta } from './validateTx'
+import type { Pool } from '../../pool'
+import { Delta, parseDelta } from '../../validateTx'
 
 // @ts-ignore
 const PoolInstance = new Contract(PoolAbi as AbiItem[])

@@ -1,7 +1,7 @@
 import { TxType } from 'zp-memo-parser'
 import BN from 'bn.js'
-import type { TxPayload } from '../queue/poolTxQueue';
-import type { Pool } from '../pool';
+import type { TxPayload } from '../queue/poolTxQueue'
+import type { Pool, PoolTx } from '../pool'
 
 export type MessageEvent = { data: string, transactionHash: string }
 
@@ -11,16 +11,24 @@ export enum TxStatus {
   Error,
 }
 
-export interface Chain {
-  init(): Promise<void>;
-  getNewEvents(): Promise<MessageEvent[]>;
-  getContractTransferNum(): Promise<string>; // TODO: Return bigint?
-  getContractMerkleRoot(index: string | number | undefined | null): Promise<string>;
-  signAndSend(txConfig: any): Promise<string>;
-  getDenominator(): Promise<string>;
-  getTxStatus(txId: any): Promise<{ status: TxStatus, blockId?: any }>;
-  parseCalldata(tx: string): PoolCalldata;
-  processTx(id: string, tx: TxPayload, pool: Pool): Promise<{ data: string, commitIndex: number }>;
+export abstract class Chain {
+  public denominator: BN = new BN(1)
+  abstract getNewEvents(): Promise<MessageEvent[]>
+  abstract getContractTransferNum(): Promise<string> // TODO: Return bigint?
+  abstract getContractMerkleRoot(index: string | number | undefined | null): Promise<string>
+  abstract signAndSend(txConfig: any): Promise<string>
+  abstract getTxStatus(txId: any): Promise<{ status: TxStatus, blockId?: any }>
+  abstract parseCalldata(tx: string): PoolCalldata
+  abstract processTx(id: string, tx: TxPayload, pool: Pool): Promise<{ data: string, commitIndex: number }>
+  abstract toBaseUnit(amount: BN): BN
+  abstract fromBaseUnit(amount: BN): BN
+  toDenominatedAmount(amount: BN): BN {
+    return amount.div(this.denominator)
+  }
+  fromDenominatedAmount(amount: BN): BN {
+    return amount.mul(this.denominator)
+  }
+  async validateTx(tx: PoolTx): Promise<void> {}
 }
 
 export class PoolCalldata {
