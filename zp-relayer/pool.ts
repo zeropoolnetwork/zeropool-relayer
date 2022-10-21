@@ -15,6 +15,7 @@ import { Chain } from './chains/chain'
 // import { EvmChain } from './chains/evm'
 import { NearChain, NearConfig } from './chains/near'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from './utils/redisFields';
+import { ZeropoolIndexer } from './indexer';
 
 export interface PoolTx {
   proof: Proof
@@ -31,8 +32,9 @@ class Pool {
   public state: PoolState = null!
   public optimisticState: PoolState = null!
   public chain: Chain = null!
+  public indexer: ZeropoolIndexer = null!
 
-  static async create(chain: Chain): Promise<Pool> {
+  static async create(chain: Chain, indexer: ZeropoolIndexer): Promise<Pool> {
     const self = new Pool()
 
     self.treeParams = Params.fromFile(config.treeUpdateParamsPath)
@@ -41,6 +43,8 @@ class Pool {
     self.state = new PoolState(`${config.storagePrefix || config.chain}.${config.tokenAddress}.pool`)
     self.optimisticState = new PoolState(`${config.storagePrefix || config.chain}.${config.tokenAddress}.optimistic`)
     self.chain = chain
+    self.indexer = indexer
+
     await self.syncState()
     return self
   }
@@ -92,7 +96,7 @@ class Pool {
 
 
     const fromBlock = await readLatestCheckedBlock()
-    const events = await this.chain.getEvents(fromBlock)
+    const events = await this.indexer.getTransactions({ block_height: fromBlock })
     const latestBlockId = await this.chain.getLatestBlockId()
 
     if (events.length !== missedIndices.length) {
@@ -101,19 +105,19 @@ class Pool {
     }
 
     for (let i = 0; i < events.length; i++) {
-      const { data, transactionHash } = events[i]
-      const calldata = this.chain.parseCalldata(data)
+      const { calldata, hash } = events[i]
+      const poolCalldata = this.chain.parseCalldata(calldata)
 
-      await this.state.nullifiers.add([calldata.nullifier.toString()])
+      await this.state.nullifiers.add([poolCalldata.nullifier.toString()])
 
-      const outCommit = calldata.outCommit
-      const txTypeRaw = calldata.txType
+      const outCommit = poolCalldata.outCommit
+      const txTypeRaw = poolCalldata.txType
       const txType = numToTxType(txTypeRaw)
 
-      const memoRaw = Buffer.from(calldata.memo).toString('hex')
+      const memoRaw = Buffer.from(poolCalldata.memo).toString('hex')
 
       const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-      const commitAndMemo = numToHex(outCommit).concat(transactionHash).concat(truncatedMemo)
+      const commitAndMemo = numToHex(outCommit).concat(hash).concat(truncatedMemo)
 
       const index = localIndex + i * OUTPLUSONE
       for (let state of [this.state, this.optimisticState]) {
@@ -154,7 +158,6 @@ export async function initPool() {
     // case 'polkadot': chain = await PolkadotChain.create(); break
     case 'near': {
       const nearConfig: NearConfig = {
-        indexerUrl: config.nearIndexerUrl,
         networkId: config.nearNetworkId,
         nodeUrl: config.rpcUrl,
         poolContractId: config.poolAddress,
@@ -168,7 +171,9 @@ export async function initPool() {
     default: throw new Error(`Unknown chain '${config.chain}'`)
   }
 
-  pool = await Pool.create(chain)
+  const indexer = new ZeropoolIndexer(config.indexerUrl)
+
+  pool = await Pool.create(chain, indexer)
 }
 
 export type { Pool }

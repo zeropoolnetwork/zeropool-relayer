@@ -13,7 +13,6 @@ export enum TxStatus {
 
 export abstract class Chain {
   public denominator: BN = new BN(1)
-  abstract getEvents(fromBlock: number): Promise<MessageEvent[]>
   abstract getLatestBlockId(): Promise<number>
   abstract getContractTransferNum(): Promise<string> // TODO: Return bigint?
   abstract getContractMerkleRoot(index: string | number | undefined | null): Promise<string>

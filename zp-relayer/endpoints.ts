@@ -13,6 +13,7 @@ import {
 } from './validation/validation'
 import { connect, Contract, KeyPair, keyStores, WalletConnection } from 'near-api-js';
 import connectPg from 'pg-promise';
+import { ZeropoolIndexer } from './indexer';
 
 
 const txProof = (() => {
@@ -167,33 +168,12 @@ function getFee(req: Request, res: Response) {
 }
 
 async function getBlockchainTransaction(req: Request, res: Response) {
-  if (config.chain !== 'near') {
-    res.status(400).json({ error: `${config.chain} is not supported` })
-    return
-  }
-
   const hash = req.params.hash
-  const indexer = connectPg()(config.nearIndexerUrl!)
+  const indexer = new ZeropoolIndexer(config.indexerUrl)
+  const tx = await indexer.getTransaction(hash)
 
-  let tx: any[]
-  do {
-    try {
-      tx = await indexer.any(`
-        SELECT tx.transaction_hash, tx.block_timestamp, tx.receiver_account_id, tx.signature, a.args
-          FROM transactions AS tx
-          JOIN transaction_actions AS a ON tx.transaction_hash = a.transaction_hash
-          WHERE tx.transaction_hash = $2 AND a.action_kind = 'FUNCTION_CALL'
-      `, [config.poolAddress, hash])
-    } catch (err) {
-      logger.warn('Failed to fetch transaction from near indexer, retrying in 1 second...', err)
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-  } while (!tx!)
-
-  let result: any = null
-  if (tx[0] && tx[0].args.method_name == 'transact') {
-    result = tx[0]
-    res.json(result)
+  if (tx) {
+    res.json(tx)
   } else {
     res.status(404).json({ error: 'Transaction not found' })
   }

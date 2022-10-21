@@ -33,7 +33,7 @@ const config = {
   sentTxDelay: parseInt(process.env.SENT_TX_DELAY || '30000'),
   chain: process.env.RELAYER_CHAIN!,
   nearNetworkId: process.env.NEAR_NETWORK_ID!,
-  nearIndexerUrl: process.env.NEAR_INDEXER_URL!,
+  indexerUrl: process.env.INDEXER_URL!,
 }
 
 export default config

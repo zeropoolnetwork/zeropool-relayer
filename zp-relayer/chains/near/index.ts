@@ -18,7 +18,6 @@ import { logger } from '../../services/appLogger'
 import { TxPayload } from '../../queue/poolTxQueue'
 import { Pool } from '../../pool'
 import { parseDelta } from '../../validateTx'
-import { NearIndexerApi } from './indexer';
 
 const MAX_GAS = new BN('300000000000000')
 
@@ -104,14 +103,12 @@ export interface NearConfig {
   relayerAccountId: string
   relayerAccountPrivateKey: string
   poolContractId: string
-  indexerUrl: string
   tokenId: string
 }
 
 export class NearChain extends Chain {
   near: Near = null!
   account: Account = null!
-  indexer: NearIndexerApi = null!
   config: NearConfig = null!
 
   static async create(config: NearConfig): Promise<NearChain> {
@@ -136,7 +133,6 @@ export class NearChain extends Chain {
     //   viewMethods: ['pool_index', 'merkle_root'],
     // })
 
-    self.indexer = await NearIndexerApi.create(config.indexerUrl, config.poolContractId)
     self.denominator = new BN('1000000000000000')
 
     return self
@@ -212,30 +208,7 @@ export class NearChain extends Chain {
   // For near, use block time
   async getLatestBlockId(): Promise<number> {
     const status = await this.near.connection.provider.status()
-    const blockTime = new Date(status.sync_info.latest_block_time)
-    return blockTime.getTime() * 1000000 // to ns
-  }
-
-  async getEvents(fromBlock: number): Promise<MessageEvent[]> {
-    try {
-      const txs = await this.indexer.getTransactions(fromBlock)
-
-      const events: MessageEvent[] = txs.map(tx => {
-        return {
-          transactionHash: tx.transaction_hash,
-          data: tx.args.args_base64,
-        }
-      })
-
-      logger.debug(`${events.length} Past events obtained`)
-
-      return events
-
-    }
-    catch (e) {
-      logger.error('Failed to sync transactions:', e);
-      throw e;
-    }
+    return status.sync_info.latest_block_height
   }
 
   async getContractTransferNum(): Promise<string> {

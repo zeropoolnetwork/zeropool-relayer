@@ -23,9 +23,12 @@ export class ZeropoolIndexer {
     return await res.json();
   }
 
-  public async getTransaction(hash: string): Promise<IndexerTx> {
+  public async getTransaction(hash: string): Promise<IndexerTx | null> {
     const url = this.assembleUrl(`/transactions/${hash}`);
     const res = await fetch(url.toString());
+    if (res.status == 404) {
+      return null;
+    }
     return await res.json();
   }
 
