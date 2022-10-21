@@ -126,16 +126,6 @@ const AjvGetTransactionsV2Schema: JSONSchemaType<{
   required: [],
 }
 
-const AjvGetLimitsSchema: JSONSchemaType<{
-  address: string
-}> = {
-  type: 'object',
-  properties: {
-    address: AjvNullableAddress,
-  },
-  required: [],
-}
-
 function checkErrors<T>(schema: JSONSchemaType<T>) {
   const validate = ajv.compile(schema)
   return (data: any) => {
@@ -153,4 +143,3 @@ export const checkSendTransactionErrors = checkErrors(AjvSendTransactionSchema)
 export const checkSendTransactionsErrors = checkErrors(AjvSendTransactionsSchema)
 export const checkGetTransactions = checkErrors(AjvGetTransactionsSchema)
 export const checkGetTransactionsV2 = checkErrors(AjvGetTransactionsV2Schema)
-export const checkGetLimits = checkErrors(AjvGetLimitsSchema)

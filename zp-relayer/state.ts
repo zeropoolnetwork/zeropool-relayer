@@ -104,7 +104,7 @@ export class PoolState {
     this.addCommitment(commitIndex, Helpers.strToNum(outCommit))
 
     logger.debug(`Adding tx to ${this.name} state storage`)
-    this.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
+    this.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData))
   }
 
   rollbackTo(otherState: PoolState) {
@@ -132,7 +132,7 @@ export class PoolState {
       nextOffset = offset + i * OUTPLUSONE
       const tx = this.txs.get(nextOffset)
       if (tx) {
-        txs[i] = tx.toString('hex')
+        txs[i] = tx.toString() // transactions are stored in string format for now (not binary)
       } else {
         break
       }

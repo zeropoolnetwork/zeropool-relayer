@@ -141,7 +141,7 @@ export class EvmChain extends Chain {
     return await this.contract.methods.denominator().call()
   }
 
-  async getNewEvents(): Promise<MessageEvent[]> {
+  async getEvents(): Promise<MessageEvent[]> {
     throw new Error('unimplemented')
   }
 
@@ -174,6 +174,10 @@ export class EvmChain extends Chain {
 
   toBaseUnit(amount: BN): BN {
     return toWei(amount)
+  }
+
+  getLatestBlockId(): Promise<number> {
+    return Promise.resolve(0);
   }
 }
 

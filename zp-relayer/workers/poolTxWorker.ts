@@ -76,7 +76,7 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
         await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
 
         const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
-        const txData = numToHex(toBN(outCommit)).concat(txHash.slice(2)).concat(truncatedMemo)
+        const txData = numToHex(toBN(outCommit)).concat(txHash).concat(truncatedMemo)
 
         pool.optimisticState.updateState(commitIndex, outCommit, txData)
         logger.info('Adding nullifier %s to OS', nullifier)

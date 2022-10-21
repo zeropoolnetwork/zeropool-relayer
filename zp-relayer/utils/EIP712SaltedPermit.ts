@@ -1,7 +1,7 @@
 import config from '../config'
 import { recoverTypedSignature, SignTypedDataVersion } from '@metamask/eth-sig-util'
 import Web3 from 'web3'
-import TokenAbi from '../abi/token-abi.json'
+// import TokenAbi from '../abi/token-abi.json'
 import { getChainId } from './web3'
 import { AbiItem } from 'web3-utils'
 
@@ -42,17 +42,17 @@ interface SaltedPermitMessage {
   salt: string
 }
 
-export async function initializeDomain(web3: Web3) {
-  const token = new web3.eth.Contract(TokenAbi as AbiItem[], config.tokenAddress)
-  const name = await token.methods.name().call()
-  const chainId = await getChainId(web3)
-  domain = {
-    name,
-    version: '1',
-    chainId,
-    verifyingContract: config.tokenAddress as string,
-  }
-}
+// export async function initializeDomain(web3: Web3) {
+//   const token = new web3.eth.Contract(TokenAbi as AbiItem[], config.tokenAddress)
+//   const name = await token.methods.name().call()
+//   const chainId = await getChainId(web3)
+//   domain = {
+//     name,
+//     version: '1',
+//     chainId,
+//     verifyingContract: config.tokenAddress as string,
+//   }
+// }
 
 export function recoverSaltedPermit(message: SaltedPermitMessage, signature: string) {
   if (!domain) throw new Error('Not initialized')

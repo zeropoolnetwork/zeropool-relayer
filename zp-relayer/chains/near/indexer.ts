@@ -33,7 +33,7 @@ export class NearIndexerApi {
     logger.info('Receiving contract publication date...')
     // Ignore before-redeploy transactions for now.
     const timestamp = await retry(async () => {
-      const result = await self.db.oneOrNone(`
+      const result = await self.db.one(`
           SELECT tx.block_timestamp, tx.receiver_account_id, a.args
           FROM transactions AS tx
           JOIN transaction_actions AS a ON tx.transaction_hash = a.transaction_hash
@@ -45,17 +45,13 @@ export class NearIndexerApi {
       return result.block_timestamp
     })
 
-    if (!timestamp) {
-      throw new Error('Contract not found')
-    }
-
     self.contractTimestamp = Number(timestamp)
 
     return self
   }
 
   async getTransactions(startingFrom?: number | BigInt): Promise<NearTransaction[]> {
-    return await retry(() => this.db.many(`
+    return await retry(() => this.db.manyOrNone(`
         SELECT tx.transaction_hash, tx.block_timestamp, tx.receiver_account_id, tx.signature, tx.status, a.args
           FROM transactions AS tx
           JOIN transaction_actions AS a ON tx.transaction_hash = a.transaction_hash

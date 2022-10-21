@@ -14,6 +14,7 @@ import { Chain } from './chains/chain'
 // import { PolkadotChain } from './chains/polkadot'
 // import { EvmChain } from './chains/evm'
 import { NearChain, NearConfig } from './chains/near'
+import { readLatestCheckedBlock, RelayerKeys, updateField } from './utils/redisFields';
 
 export interface PoolTx {
   proof: Proof
@@ -66,7 +67,7 @@ class Pool {
     return job.id
   }
 
-  async syncState(fromBlock: number | string = 'earliest') {
+  async syncState() {
     logger.debug('Syncing state...')
 
     const localIndex = this.state.getNextIndex()
@@ -89,35 +90,39 @@ class Pool {
       missedIndices[i] = localIndex + (i + 1) * OUTPLUSONE
     }
 
-    const events = await this.chain.getNewEvents()
 
-    // if (events.length !== missedIndices.length) {
-    //   logger.error('Not all events found')
-    //   return
-    // }
+    const fromBlock = await readLatestCheckedBlock()
+    const events = await this.chain.getEvents(fromBlock)
+    const latestBlockId = await this.chain.getLatestBlockId()
+
+    if (events.length !== missedIndices.length) {
+      logger.error('Not all events found')
+      // return
+    }
 
     for (let i = 0; i < events.length; i++) {
       const { data, transactionHash } = events[i]
-      const parser = pool.chain.parseCalldata(data)
+      const calldata = this.chain.parseCalldata(data)
 
-      await this.state.nullifiers.add([parser.nullifier.toString()])
+      await this.state.nullifiers.add([calldata.nullifier.toString()])
 
-      const outCommit = parser.outCommit
-      const txTypeRaw = parser.txType
+      const outCommit = calldata.outCommit
+      const txTypeRaw = calldata.txType
       const txType = numToTxType(txTypeRaw)
 
-      const memoRaw = Buffer.from(parser.memo).toString('hex')
+      const memoRaw = Buffer.from(calldata.memo).toString('hex')
 
       const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-      const commitAndMemo = numToHex(outCommit).concat(transactionHash.slice(2)).concat(truncatedMemo)
+      const commitAndMemo = numToHex(outCommit).concat(transactionHash).concat(truncatedMemo)
 
-      const index = parser.transferIndex.toNumber() - OUTPLUSONE
+      const index = localIndex + i * OUTPLUSONE
       for (let state of [this.state, this.optimisticState]) {
         state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
-        state.addTx(index, Buffer.from(commitAndMemo, 'hex'))
+        state.addTx(index, Buffer.from(commitAndMemo)) // store in string format for now
       }
     }
 
+    await updateField(RelayerKeys.LATEST_CHECKED_BLOCK, latestBlockId)
     logger.debug(`LOCAL ROOT AFTER UPDATE ${this.state.getMerkleRoot()}`)
   }
 

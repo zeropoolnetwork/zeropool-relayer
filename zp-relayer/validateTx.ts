@@ -59,7 +59,7 @@ export function checkTxSpecificFields(txType: TxType, tokenAmount: BN, energyAmo
   } else if (txType === TxType.WITHDRAWAL) {
     const nativeAmount = (txData as WithdrawTxData).nativeAmount
     isValid = tokenAmount.lte(ZERO) && energyAmount.lte(ZERO)
-    isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
+    // isValid = isValid && msgValue.eq(nativeAmount.mul(pool.denominator))
   }
   if (!isValid) {
     return new Error('Tx specific fields are incorrect')

@@ -143,7 +143,7 @@ export class NearChain extends Chain {
   }
 
   public async processTx(id: string, tx: TxPayload, pool: Pool): Promise<{ data: string; commitIndex: number }> {
-    const { amount, txProof, txType, rawMemo, depositSignature, fromAddress } = tx
+    const { amount, txProof, txType, rawMemo, depositId, depositSignature, fromAddress } = tx
 
     const logPrefix = `Job ${id}:`
 
@@ -180,7 +180,7 @@ export class NearChain extends Chain {
       txType: numTxType,
       memo: Buffer.from(rawMemo, 'hex'),
       depositAddress: fromAddress,
-      depositId: 0,
+      depositId: new BN(depositId!),
     })
 
     const bin = serializePoolData(calldata)
@@ -209,10 +209,15 @@ export class NearChain extends Chain {
     }
   }
 
-  async getNewEvents(): Promise<MessageEvent[]> {
+  // For near, use block time
+  async getLatestBlockId(): Promise<number> {
+    const status = await this.near.connection.provider.status()
+    const blockTime = new Date(status.sync_info.latest_block_time)
+    return blockTime.getTime() * 1000000 // to ns
+  }
+
+  async getEvents(fromBlock: number): Promise<MessageEvent[]> {
     try {
-      const fromBlock = await readLatestCheckedBlock()
-      const lastBlock = new Date((await this.near.connection.provider.status()).sync_info.latest_block_time).getTime() * 1000000; // Get timestamp in ns. TODO: Use BN?
       const txs = await this.indexer.getTransactions(fromBlock)
 
       const events: MessageEvent[] = txs.map(tx => {
@@ -223,7 +228,6 @@ export class NearChain extends Chain {
       })
 
       logger.debug(`${events.length} Past events obtained`)
-      await updateField(RelayerKeys.LATEST_CHECKED_BLOCK, lastBlock)
 
       return events
 
@@ -274,11 +278,11 @@ export class NearChain extends Chain {
   }
 
   toBaseUnit(amount: BN): BN {
-    throw new Error('Method not implemented.')
+    return this.fromDenominatedAmount(amount)
   }
 
   fromBaseUnit(amount: BN): BN {
-    throw new Error('Method not implemented.')
+    return this.toDenominatedAmount(amount)
   }
 }
 

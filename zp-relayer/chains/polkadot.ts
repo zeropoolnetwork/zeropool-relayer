@@ -40,7 +40,7 @@ export class PolkadotChain extends Chain {
   signAndSend(txConfig: any): Promise<string> {
     throw new Error('Method not implemented.');
   }
-  async getNewEvents(): Promise<MessageEvent[]> {
+  async getEvents(): Promise<MessageEvent[]> {
     try {
       const pastEvents: MessageEvent[] = []
       const fromBlock = Number(await readLatestCheckedBlock())
@@ -83,6 +83,10 @@ export class PolkadotChain extends Chain {
 
   async getContractMerkleRoot(index: string | null | undefined): Promise<string> {
     throw new Error('Method not implemented.');
+  }
+
+  getLatestBlockId(): Promise<number> {
+    return Promise.resolve(0);
   }
 
 }

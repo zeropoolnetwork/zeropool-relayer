@@ -6,7 +6,6 @@ import { poolTxQueue } from './queue/poolTxQueue'
 import config from './config'
 import { proveTx } from './prover'
 import {
-  checkGetLimits,
   checkGetTransactions,
   checkGetTransactionsV2,
   checkSendTransactionErrors,
@@ -106,10 +105,7 @@ async function getTransactionsV2(req: Request, res: Response, next: NextFunction
   }
 
   const toV2Format = (prefix: string) => (tx: string) => {
-    const outCommit = tx.slice(0, 64)
-    const txHash = tx.slice(64, 128)
-    const memo = tx.slice(128)
-    return prefix + txHash + outCommit + memo
+    return prefix + tx
   }
 
   // Types checked in validation stage
@@ -170,20 +166,6 @@ function getFee(req: Request, res: Response) {
   })
 }
 
-async function getLimits(req: Request, res: Response) {
-  const errors = checkGetLimits(req.query)
-  if (errors) {
-    logger.info('Request errors: %o', errors)
-    res.status(400).json({ errors })
-    return
-  }
-
-  const address = req.query.address as unknown as string
-  const limits = await pool.getLimitsFor(address)
-  const limitsFetch = pool.processLimits(limits)
-  res.json(limitsFetch)
-}
-
 async function getBlockchainTransaction(req: Request, res: Response) {
   if (config.chain !== 'near') {
     res.status(400).json({ error: `${config.chain} is not supported` })
@@ -231,7 +213,6 @@ export default {
   getJob,
   relayerInfo,
   getFee,
-  getLimits,
   getBlockchainTransaction,
   root,
 }
