@@ -42,9 +42,9 @@ function serializePoolData(data: PoolCalldata): Buffer {
   writer.writeU256(data.nullifier)
   writer.writeU256(data.outCommit)
   writer.writeU256(data.transferIndex)
-  writer.writeU256(data.energyAmount)
+  writer.writeI256(data.energyAmount)
   writer.writeString(data.tokenId)
-  writer.writeU256(data.tokenAmount)
+  writer.writeI256(data.tokenAmount)
   writer.writeU256(data.delta)
   for (let element of data.transactProof) {
     writer.writeU256(element)
@@ -78,6 +78,10 @@ function deserializePoolData(data: Buffer): PoolCalldata {
   const memo = reader.readDynamicBuffer()
   const depositAddress = reader.readString()
   const depositId = reader.readU64()
+
+  if (!reader.isEmpty()) {
+    throw new Error('pool data is not fully consumed');
+  }
 
   return new PoolCalldata({
     nullifier,
@@ -175,8 +179,8 @@ export class NearChain extends Chain {
       treeProof: flattenProof(treeProof.proof),
       txType: numTxType,
       memo: Buffer.from(rawMemo, 'hex'),
-      depositAddress: fromAddress,
-      depositId: new BN(depositId!),
+      depositAddress: fromAddress || 'test1234.testnet',
+      depositId: new BN(depositId || 0),
     })
 
     const bin = serializePoolData(calldata)

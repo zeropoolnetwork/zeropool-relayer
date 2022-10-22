@@ -71,6 +71,11 @@ export class BinaryWriter {
     this.writeBuffer(Buffer.from(new BN(value).toArray('le', 32)));
   }
 
+  public writeI256(value: number | BN) {
+    this.maybeResize();
+    this.writeBuffer(Buffer.from(new BN(value).toTwos(256).toArray('le', 32)));
+  }
+
   public writeU512(value: number | BN) {
     this.maybeResize();
     this.writeBuffer(Buffer.from(new BN(value).toArray('le', 64)));
@@ -179,6 +184,12 @@ export class BinaryReader {
   }
 
   @handlingRangeError
+  readI256(): BN {
+    const buf = this.readBuffer(32);
+    return new BN(buf, 'le').fromTwos(256);
+  }
+
+  @handlingRangeError
   readU512(): BN {
     const buf = this.readBuffer(64);
     return new BN(buf, 'le');
@@ -197,6 +208,10 @@ export class BinaryReader {
   public readDynamicBuffer(): Buffer {
     const len = this.readU32();
     return this.readBuffer(len);
+  }
+
+  isEmpty(): boolean {
+    return this.offset === this.buf.length;
   }
 
   @handlingRangeError
@@ -229,4 +244,5 @@ export class BinaryReader {
     }
     return result;
   }
+
 }
