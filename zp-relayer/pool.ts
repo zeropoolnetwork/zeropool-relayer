@@ -88,24 +88,20 @@ class Pool {
       return
     }
 
+    const fromBlock = Number(await readLatestCheckedBlock())
+    let latestBlockId = fromBlock
     const numTxs = Math.floor((contractIndex - localIndex) / OUTPLUSONE)
-    const missedIndices = Array(numTxs)
-    for (let i = 0; i < numTxs; i++) {
-      missedIndices[i] = localIndex + (i + 1) * OUTPLUSONE
-    }
-
-
-    const fromBlock = await readLatestCheckedBlock()
     const events = await this.indexer.getTransactions({ block_height: fromBlock })
-    const latestBlockId = await this.chain.getLatestBlockId()
 
-    if (events.length !== missedIndices.length) {
-      logger.error('Not all events found')
+    logger.debug(`Found ${events.length} events from block ${fromBlock}`)
+
+    if (events.length !== numTxs) {
+      logger.error('Number of received transactions does not match number of transactions in contract')
       // return
     }
 
     for (let i = 0; i < events.length; i++) {
-      const { calldata, hash } = events[i]
+      const { calldata, hash, block_height } = events[i]
       const poolCalldata = this.chain.parseCalldata(calldata)
 
       await this.state.nullifiers.add([poolCalldata.nullifier.toString()])
@@ -124,6 +120,8 @@ class Pool {
         state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
         state.addTx(index, Buffer.from(commitAndMemo)) // store in string format for now
       }
+
+      latestBlockId = block_height
     }
 
     await updateField(RelayerKeys.LATEST_CHECKED_BLOCK, latestBlockId)
