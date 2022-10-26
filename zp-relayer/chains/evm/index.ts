@@ -49,7 +49,7 @@ export class EvmChain extends Chain {
     return self
   }
 
-  async validateTx({ txType, proof, memo, depositSignature }: PoolTx): Promise<void> {
+  async validateTx({ txType, proof, memo }: PoolTx): Promise<void> {
     const buf = Buffer.from(memo, 'hex')
     const txData = getTxData(buf, txType)
 
@@ -70,8 +70,9 @@ export class EvmChain extends Chain {
     const requiredTokenAmount = tokenAmountWithFee.mul(this.denominator)
     let userAddress = ZERO_ADDRESS
     if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-      userAddress = await this.getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, depositSignature)
-      await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
+      throw new Error('unimplemented, extract depositSignature from memo');
+      // userAddress = await this.getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, depositSignature)
+      // await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
     }
   }
 

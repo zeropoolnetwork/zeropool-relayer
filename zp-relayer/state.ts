@@ -104,7 +104,7 @@ export class PoolState {
     this.addCommitment(commitIndex, Helpers.strToNum(outCommit))
 
     logger.debug(`Adding tx to ${this.name} state storage`)
-    this.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData))
+    this.addTx(commitIndex * OUTPLUSONE, Buffer.from(txData, 'hex'))
   }
 
   rollbackTo(otherState: PoolState) {

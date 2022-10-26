@@ -41,10 +41,7 @@ function serializePoolData(data: PoolCalldata): Buffer {
   const writer = new BinaryWriter()
   writer.writeU256(data.nullifier)
   writer.writeU256(data.outCommit)
-  writer.writeU256(data.transferIndex)
-  writer.writeI256(data.energyAmount)
   writer.writeString(data.tokenId)
-  writer.writeI256(data.tokenAmount)
   writer.writeU256(data.delta)
   for (let element of data.transactProof) {
     writer.writeU256(element)
@@ -55,8 +52,6 @@ function serializePoolData(data: PoolCalldata): Buffer {
   }
   writer.writeU8(data.txType)
   writer.writeDynamicBuffer(Buffer.from(data.memo))
-  writer.writeString(data.depositAddress)
-  writer.writeU64(data.depositId)
 
   return Buffer.from(writer.toArray())
 }
@@ -66,18 +61,13 @@ function deserializePoolData(data: Buffer): PoolCalldata {
 
   const nullifier = reader.readU256()
   const outCommit = reader.readU256()
-  const transferIndex = reader.readU256()
-  const energyAmount = reader.readU256()
   const tokenId = reader.readString()
-  const tokenAmount = reader.readU256()
   const delta = reader.readU256()
   const transactProof = reader.readFixedArray(8, () => reader.readU256())
   const rootAfter = reader.readU256()
   const treeProof = reader.readFixedArray(8, () => reader.readU256())
   const txType = reader.readU8()
   const memo = reader.readDynamicBuffer()
-  const depositAddress = reader.readString()
-  const depositId = reader.readU64()
 
   if (!reader.isEmpty()) {
     throw new Error('pool data is not fully consumed');
@@ -86,18 +76,13 @@ function deserializePoolData(data: Buffer): PoolCalldata {
   return new PoolCalldata({
     nullifier,
     outCommit,
-    transferIndex,
-    energyAmount,
     tokenId,
-    tokenAmount,
     delta,
     transactProof,
     rootAfter,
     treeProof,
     txType,
     memo,
-    depositAddress,
-    depositId,
   })
 }
 
@@ -143,13 +128,11 @@ export class NearChain extends Chain {
   }
 
   public async processTx(id: string, tx: TxPayload, pool: Pool): Promise<{ data: string; commitIndex: number }> {
-    const { amount, txProof, txType, rawMemo, depositId, depositSignature, fromAddress } = tx
+    const { amount, txProof, txType, rawMemo } = tx
 
     const logPrefix = `Job ${id}:`
 
     logger.info(`${logPrefix} Received ${txType} tx with ${amount} native amount`)
-
-    const delta = parseDelta(txProof.inputs[3])
 
     const outCommit = txProof.inputs[2]
     const { pub, sec, commitIndex } = pool.optimisticState.getVirtualTreeProofInputs(outCommit)
@@ -169,18 +152,13 @@ export class NearChain extends Chain {
     const calldata: PoolCalldata = new PoolCalldata({
       nullifier: new BN(txProof.inputs[1]),
       outCommit: new BN(treeProof.inputs[2]),
-      transferIndex: delta.transferIndex,
-      energyAmount: delta.energyAmount,
       tokenId: this.config.tokenId,
-      tokenAmount: delta.tokenAmount,
       delta: new BN(txProof.inputs[3]),
       transactProof: flattenProof(txProof.proof),
       rootAfter: new BN(treeProof.inputs[1]),
       treeProof: flattenProof(treeProof.proof),
       txType: numTxType,
       memo: Buffer.from(rawMemo, 'hex'),
-      depositAddress: fromAddress || 'test1234.testnet',
-      depositId: new BN(depositId || 0),
     })
 
     const bin = serializePoolData(calldata)

@@ -33,6 +33,7 @@
     "ts-node": "^10.1.0",
     "web3": "1.7.4",
     "winston": "3.3.3",
+    "bs58": "^5.0.0",
     "zp-memo-parser": "link:../zp-memo-parser"
   },
   "devDependencies": {

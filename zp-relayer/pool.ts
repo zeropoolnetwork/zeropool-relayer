@@ -21,9 +21,6 @@ export interface PoolTx {
   proof: Proof
   memo: string
   txType: TxType
-  depositSignature: string | null
-  depositId: number | null
-  fromAddress: string | null
 }
 
 class Pool {
@@ -54,16 +51,13 @@ class Pool {
       await this.chain.validateTx(tx)
     }
 
-    const queueTxs = txs.map(({ proof, txType, memo, depositSignature, depositId, fromAddress }) => {
+    const queueTxs = txs.map(({ proof, txType, memo }) => {
       return {
         amount: '0',
         gas: config.relayerGasLimit.toString(),
         txProof: proof,
         txType,
         rawMemo: memo,
-        depositSignature,
-        depositId,
-        fromAddress,
       }
     })
     const job = await poolTxQueue.add('tx', queueTxs)
