@@ -11,6 +11,7 @@ import { BinaryWriter, BinaryReader } from '../../utils/binary'
 import BN from 'bn.js'
 import { TxType } from 'zp-memo-parser'
 import { Proof, SnarkProof } from 'libzkbob-rs-node'
+import bs58 from 'bs58'
 
 import { Chain, MessageEvent, TxStatus, PoolCalldata } from '../chain'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from '../../utils/redisFields'
@@ -18,6 +19,7 @@ import { logger } from '../../services/appLogger'
 import { TxPayload } from '../../queue/poolTxQueue'
 import { Pool } from '../../pool'
 import { parseDelta } from '../../validateTx'
+import { numToHex, truncateHexPrefix } from '../../utils/helpers';
 
 const MAX_GAS = new BN('300000000000000')
 
@@ -165,6 +167,12 @@ export class NearChain extends Chain {
     const data = Buffer.from(bin).toString('base64')
 
     return { data, commitIndex }
+  }
+
+  prepareTxForStorage(outCommit: BN, hash: string, memo: string): string {
+    // Store hash as hex
+    const hexHash = Buffer.from(bs58.decode(hash)).toString('hex');
+    return numToHex(outCommit).concat(hexHash).concat(memo)
   }
 
   parseCalldata(tx: string): PoolCalldata {

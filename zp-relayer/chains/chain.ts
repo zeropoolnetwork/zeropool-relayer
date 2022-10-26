@@ -29,6 +29,10 @@ export abstract class Chain {
     return amount.mul(this.denominator)
   }
   async validateTx(tx: PoolTx): Promise<void> {}
+
+  prepareTxForStorage(outCommit: BN, hash: string, truncatedMemo: string): string {
+    throw new Error('Not implemented')
+  }
 }
 
 export class PoolCalldata {

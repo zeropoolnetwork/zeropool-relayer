@@ -107,12 +107,12 @@ class Pool {
       const memoRaw = Buffer.from(poolCalldata.memo).toString('hex')
 
       const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-      const commitAndMemo = numToHex(outCommit).concat(hash).concat(truncatedMemo)
+      const commitAndMemo = this.chain.prepareTxForStorage(outCommit, hash, truncatedMemo)
 
       const index = localIndex + i * OUTPLUSONE
       for (let state of [this.state, this.optimisticState]) {
         state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
-        state.addTx(index, Buffer.from(commitAndMemo)) // store in string format for now
+        state.addTx(index, Buffer.from(commitAndMemo, 'hex')) // store in string format for now
       }
 
       latestBlockId = block_height
