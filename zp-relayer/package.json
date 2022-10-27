@@ -6,6 +6,7 @@
   "scripts": {
     "initialize": "git submodule update --init && yarn install --unsafe-perm --frozen-lockfile && yarn build:libzeropool-rs-node && yarn build:libzeropool-rs-wasm",
     "build": "tsc --project ./",
+    "check": "tsc --noEmit --project ./",
     "dev:server": "ts-node index.ts",
     "dev:worker": "ts-node poolTxWorker.ts",
     "start:dev": "ts-node index.ts",

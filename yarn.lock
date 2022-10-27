@@ -51,13 +51,6 @@
     enabled "2.0.x"
     kuler "^2.0.0"
 
-"@dao-xyz/borsh@^3.2.5":
-  version "3.2.5"
-  resolved "https://registry.yarnpkg.com/@dao-xyz/borsh/-/borsh-3.2.5.tgz#242158271b23b7ca8043299edad0abb6e963cd24"
-  integrity sha512-+Prm3uWl5iSMcnVif/4ikOoWXAcxUgKl01qGjItzLmxlOWIeAkobwae0UNnxJvFozMe/1uDDuTq2Xgi09DUY6Q==
-  dependencies:
-    text-encoding-utf-8 "^1.0.2"
-
 "@discoveryjs/json-ext@^0.5.0":
   version "0.5.5"
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.5.tgz#9283c9ce5b289a3c4f61c12757469e59377f81f3"
@@ -1360,6 +1353,11 @@ base-x@^3.0.2, base-x@^3.0.8:
   dependencies:
     safe-buffer "^5.0.1"
 
+base-x@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/base-x/-/base-x-4.0.0.tgz#d0e3b7753450c73f8ad2389b5c018a4af7b2224a"
+  integrity sha512-FuwxlW4H5kh37X/oW59pwTzzTKRzfrrQwhmyspRM7swOEZcHtDZSCt45U6oKgtuFE+WYPblePMVIPR4RZrh/hw==
+
 base64-js@^1.3.1:
   version "1.5.1"
   resolved "https://registry.yarnpkg.com/base64-js/-/base64-js-1.5.1.tgz#1b1b440160a5bf7ad40b650f095963481903930a"
@@ -1568,6 +1566,13 @@ bs58@^4.0.0:
   integrity sha1-vhYedsNU9veIrkBx9j806MTwpCo=
   dependencies:
     base-x "^3.0.2"
+
+bs58@^5.0.0:
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/bs58/-/bs58-5.0.0.tgz#865575b4d13c09ea2a84622df6c8cbeb54ffc279"
+  integrity sha512-r+ihvQJvahgYT50JD05dyJNKlmmSlMoOGwn1lCcEzanPglg7TxYjioQUYehQ9mAR/+hOSd2jRc/Z2y5UxBymvQ==
+  dependencies:
+    base-x "^4.0.0"
 
 bs58check@^2.1.2:
   version "2.1.2"

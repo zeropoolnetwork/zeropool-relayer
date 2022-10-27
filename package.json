@@ -1,6 +1,6 @@
 {
   "name": "zp-relayer",
-  "version": "0.1.28",
+  "version": "0.2.0-near",
   "private": true,
   "devDependencies": {
     "chai": "^4.3.4",

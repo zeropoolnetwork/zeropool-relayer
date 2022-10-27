@@ -23,22 +23,6 @@ import { numToHex, truncateHexPrefix } from '../../utils/helpers';
 
 const MAX_GAS = new BN('300000000000000')
 
-// pub struct Tx {
-//     pub nullifier: U256,
-//     pub out_commit: U256,
-//     pub transfer_index: U256,
-//     pub energy_amount: U256,
-//     pub token_id: AccountId,
-//     pub token_amount: U256,
-//     pub delta: U256,
-//     pub transact_proof: Proof,
-//     pub root_after: U256,
-//     pub tree_proof: Proof,
-//     pub tx_type: TxType,
-//     pub memo: Memo,
-//     pub deposit_address: AccountId,
-//     pub deposit_id: u64,
-// }
 function serializePoolData(data: PoolCalldata): Buffer {
   const writer = new BinaryWriter()
   writer.writeU256(data.nullifier)
