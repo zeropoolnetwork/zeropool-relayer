@@ -16,6 +16,7 @@ import type { EstimationType, GasPrice } from '../services/GasPrice'
 import { getChainId } from '../utils/web3'
 import { TxPayload } from '../queue/poolTxQueue'
 import { sentTxQueue } from '../queue/sentTxQueue';
+import bs58 from 'bs58';
 
 const WORKER_OPTIONS = {
   autorun: false,
@@ -76,7 +77,8 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
         await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
 
         const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
-        const txData = numToHex(toBN(outCommit)).concat(txHash).concat(truncatedMemo)
+        const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
+        const txData = numToHex(toBN(outCommit)).concat(hexTxHash).concat(truncatedMemo)
 
         pool.optimisticState.updateState(commitIndex, outCommit, txData)
         logger.info('Adding nullifier %s to OS', nullifier)
