@@ -245,4 +245,14 @@ export class BinaryReader {
     return result;
   }
 
+  @handlingRangeError
+  readBufferUntilEnd(): Buffer | null {
+    const len = this.buf.length - this.offset;
+
+    if (len <= 0) {
+      return null;
+    }
+
+    return this.readBuffer(len);
+  }
 }

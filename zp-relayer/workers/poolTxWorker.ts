@@ -40,7 +40,7 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
 
     const txHashes = []
     for (const tx of txs) {
-      const { gas, amount, rawMemo, txType, txProof } = tx
+      const { gas, amount, rawMemo, txType, txProof, extraData } = tx
 
       const nullifier = txProof.inputs[1]
       const outCommit = txProof.inputs[2]

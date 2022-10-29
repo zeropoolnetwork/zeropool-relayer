@@ -48,5 +48,6 @@ export class PoolCalldata {
   rootAfter!: BN
   treeProof!: BN[]
   txType!: number
-  memo!: Uint8Array
+  memo!: Buffer
+  extraData?: Buffer
 }

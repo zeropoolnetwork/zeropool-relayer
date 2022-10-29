@@ -49,11 +49,12 @@ async function sendTransactions(req: Request, res: Response, next: NextFunction)
 
   const rawTxs = req.body
   const txs = rawTxs.map((tx: any) => {
-    const { proof, memo, txType } = tx
+    const { proof, memo, txType, extraData, } = tx
     return {
       proof,
       memo,
       txType,
+      extraData,
     }
   })
   const jobId = await pool.transact(txs)
@@ -68,8 +69,8 @@ async function sendTransaction(req: Request, res: Response, next: NextFunction) 
     return
   }
 
-  const { proof, memo, txType } = req.body
-  const tx = [{ proof, memo, txType }]
+  const { proof, memo, txType, extraData } = req.body
+  const tx = [{ proof, memo, txType, extraData }]
   const jobId = await pool.transact(tx)
   res.json({ jobId })
 }

@@ -73,7 +73,6 @@ export async function createSentTxWorker<T extends EstimationType>(mutex: Mutex,
     const tx = await pool.chain.getTxStatus(txHash)
     const status = tx.status
 
-    // Tx mined
     if (status == TxStatus.Mined) {
       // Successful
       logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockId)
@@ -114,31 +113,7 @@ export async function createSentTxWorker<T extends EstimationType>(mutex: Mutex,
       const root1 = pool.state.getMerkleRoot()
       const root2 = pool.optimisticState.getMerkleRoot()
       logger.info(`Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`)
-    } else {
-      console.warn('Gas price adjustment is not implemented')
-      // const txConfig = job.data.txConfig
-
-      // const oldGasPrice = txConfig.gasPrice
-      // let newGasPrice
-      // if (gasPrice) {
-      //   newGasPrice = gasPrice.getPrice()
-      // }
-
-      // logger.warn('Tx unmined; updating gasPrice: %o -> %o', oldGasPrice, newGasPrice)
-
-      // const newTxConfig = updateTxGasPrice(txConfig, newGasPrice)
-
-      // const newJobData = {
-      //   ...job.data,
-      //   txConfig: newTxConfig,
-      // }
-
-      // await sentTxQueue.add(txHash, newJobData, {
-      //   priority: txConfig.nonce,
-      //   delay: config.sentTxDelay,
-      // })
     }
-
   }
   const sentTxWorker = new Worker<SentTxPayload>(
     SENT_TX_QUEUE_NAME,

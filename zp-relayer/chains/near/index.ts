@@ -38,6 +38,9 @@ function serializePoolData(data: PoolCalldata): Buffer {
   }
   writer.writeU8(data.txType)
   writer.writeDynamicBuffer(Buffer.from(data.memo))
+  if (data.extraData) {
+    writer.writeFixedArray(data.extraData)
+  }
 
   return Buffer.from(writer.toArray())
 }
@@ -54,6 +57,7 @@ function deserializePoolData(data: Buffer): PoolCalldata {
   const treeProof = reader.readFixedArray(8, () => reader.readU256())
   const txType = reader.readU8()
   const memo = reader.readDynamicBuffer()
+  const extraData = reader.readBufferUntilEnd()
 
   if (!reader.isEmpty()) {
     throw new Error('pool data is not fully consumed');
@@ -69,6 +73,7 @@ function deserializePoolData(data: Buffer): PoolCalldata {
     treeProof,
     txType,
     memo,
+    extraData,
   })
 }
 
@@ -114,7 +119,7 @@ export class NearChain extends Chain {
   }
 
   public async processTx(id: string, tx: TxPayload, pool: Pool): Promise<{ data: string; commitIndex: number }> {
-    const { amount, txProof, txType, rawMemo } = tx
+    const { amount, txProof, txType, rawMemo, extraData } = tx
 
     const logPrefix = `Job ${id}:`
 
@@ -145,6 +150,7 @@ export class NearChain extends Chain {
       treeProof: flattenProof(treeProof.proof),
       txType: numTxType,
       memo: Buffer.from(rawMemo, 'hex'),
+      extraData: Buffer.from(extraData, 'hex'),
     })
 
     const bin = serializePoolData(calldata)
