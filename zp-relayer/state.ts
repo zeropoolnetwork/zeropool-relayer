@@ -132,7 +132,7 @@ export class PoolState {
       nextOffset = offset + i * OUTPLUSONE
       const tx = this.txs.get(nextOffset)
       if (tx) {
-        txs[i] = tx.toString() // transactions are stored in string format for now (not binary)
+        txs[i] = tx.toString('hex')
       } else {
         break
       }

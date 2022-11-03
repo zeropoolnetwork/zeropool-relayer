@@ -6,7 +6,7 @@ import { web3 } from '../services/web3'
 import { logger } from '../services/appLogger'
 import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT } from '../utils/constants'
 import { readNonce, updateField, RelayerKeys, incrNonce } from '../utils/redisFields'
-import { numToHex, truncateMemoTxPrefix, withMutex } from '../utils/helpers'
+import { numToHex, withMutex } from '../utils/helpers'
 import { pool } from '../pool'
 import config from '../config'
 import { redis } from '../services/redisClient'
@@ -76,7 +76,7 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
 
         await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
 
-        const truncatedMemo = truncateMemoTxPrefix(rawMemo, txType)
+        const truncatedMemo = pool.chain.extractCiphertextFromTx(rawMemo, txType)
         const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
         const txData = numToHex(toBN(outCommit)).concat(hexTxHash).concat(truncatedMemo)
 

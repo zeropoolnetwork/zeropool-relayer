@@ -140,6 +140,8 @@ export class NearChain extends Chain {
       default: throw new Error(`Unsupported tx type: ${txType}`)
     }
 
+    const extraDataBuf = extraData ? Buffer.from(extraData, 'hex') : null
+
     const calldata: PoolCalldata = new PoolCalldata({
       nullifier: new BN(txProof.inputs[1]),
       outCommit: new BN(treeProof.inputs[2]),
@@ -150,7 +152,7 @@ export class NearChain extends Chain {
       treeProof: flattenProof(treeProof.proof),
       txType: numTxType,
       memo: Buffer.from(rawMemo, 'hex'),
-      extraData: Buffer.from(extraData, 'hex'),
+      extraData: extraDataBuf,
     })
 
     const bin = serializePoolData(calldata)
@@ -236,6 +238,29 @@ export class NearChain extends Chain {
 
   fromBaseUnit(amount: BN): BN {
     return this.toDenominatedAmount(amount)
+  }
+
+  extractCiphertextFromTx(memo: string, txType: TxType): string {
+    let offset = 0;
+    switch (txType) {
+      case TxType.DEPOSIT:
+      case TxType.TRANSFER: {
+        offset = 16;
+        break;
+      }
+      case TxType.PERMITTABLE_DEPOSIT: {
+        offset = 72;
+        break;
+      }
+      case TxType.WITHDRAWAL: {
+        offset = 32;
+        const reader = new BinaryReader(Buffer.from(memo.slice(offset), 'hex'))
+        const addrLength = reader.readU32()
+        offset += 8 + addrLength * 2
+      }
+    }
+
+    return memo.slice(offset)
   }
 }
 

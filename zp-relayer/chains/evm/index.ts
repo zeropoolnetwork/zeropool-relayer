@@ -180,6 +180,19 @@ export class EvmChain extends Chain {
   getLatestBlockId(): Promise<number> {
     return Promise.resolve(0);
   }
+
+  extractCiphertextFromTx(memo: string, txType: TxType): string {
+    const txTypePrefixLen = {
+      [TxType.DEPOSIT]: 16,
+      [TxType.TRANSFER]: 16,
+      // 16 + 16 + 40
+      [TxType.WITHDRAWAL]: 72,
+      [TxType.PERMITTABLE_DEPOSIT]: 72,
+    }
+
+    const txSpecificPrefixLen = txTypePrefixLen[txType]
+    return memo.slice(txSpecificPrefixLen)
+  }
 }
 
 export async function getNonce(web3: Web3, address: string) {

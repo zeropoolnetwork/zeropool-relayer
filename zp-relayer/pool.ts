@@ -8,7 +8,7 @@ import { Helpers, Params, Proof, SnarkProof, VK } from 'libzkbob-rs-node'
 import { PoolState } from './state'
 
 import { TxType } from 'zp-memo-parser'
-import { numToHex, numToTxType, truncateMemoTxPrefix } from './utils/helpers'
+import { numToHex, numToTxType } from './utils/helpers'
 import { OUTPLUSONE } from './utils/constants'
 import { Chain } from './chains/chain'
 // import { PolkadotChain } from './chains/polkadot'
@@ -21,7 +21,7 @@ export interface PoolTx {
   proof: Proof
   memo: string
   txType: TxType
-  extraData: string
+  extraData?: string
 }
 
 class Pool {
@@ -87,37 +87,49 @@ class Pool {
     const fromBlock = Number(await readLatestCheckedBlock())
     let latestBlockId = fromBlock
     const numTxs = Math.floor((contractIndex - localIndex) / OUTPLUSONE)
-    const events = await this.indexer.getTransactions({ block_height: fromBlock })
 
-    logger.debug(`Found ${events.length} events from block ${fromBlock}`)
 
-    if (events.length !== numTxs) {
-      logger.error('Number of received transactions does not match number of transactions in contract')
-      // return
-    }
+    const LIMIT = 100
 
-    for (let i = 0; i < events.length; i++) {
-      const { calldata, hash, block_height } = events[i]
-      const poolCalldata = this.chain.parseCalldata(calldata)
+    let newNumTxs = 0
+    let batch = 0
+    let events
+    do {
+      events = await this.indexer.getTransactions({ block_height: latestBlockId, limit: LIMIT })
 
-      await this.state.nullifiers.add([poolCalldata.nullifier.toString()])
+      logger.debug(`Found ${events.length} events from block ${fromBlock}`)
 
-      const outCommit = poolCalldata.outCommit
-      const txTypeRaw = poolCalldata.txType
-      const txType = numToTxType(txTypeRaw)
+      for (let i = 0; i < events.length; i++) {
+        const { calldata, hash, block_height } = events[i]
+        const poolCalldata = this.chain.parseCalldata(calldata)
 
-      const memoRaw = Buffer.from(poolCalldata.memo).toString('hex')
+        await this.state.nullifiers.add([poolCalldata.nullifier.toString()])
 
-      const truncatedMemo = truncateMemoTxPrefix(memoRaw, txType)
-      const commitAndMemo = this.chain.prepareTxForStorage(outCommit, hash, truncatedMemo)
+        const outCommit = poolCalldata.outCommit
+        const txTypeRaw = poolCalldata.txType
+        const txType = numToTxType(txTypeRaw)
 
-      const index = localIndex + i * OUTPLUSONE
-      for (let state of [this.state, this.optimisticState]) {
-        state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
-        state.addTx(index, Buffer.from(commitAndMemo, 'hex')) // store in string format for now
+        const memoRaw = Buffer.from(poolCalldata.memo).toString('hex')
+
+        const truncatedMemo = this.chain.extractCiphertextFromTx(memoRaw, txType)
+        const commitAndMemo = this.chain.prepareTxForStorage(outCommit, hash, truncatedMemo)
+
+        const index = localIndex + (batch * LIMIT + i) * OUTPLUSONE
+        for (let state of [this.state, this.optimisticState]) {
+          state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
+          state.addTx(index, Buffer.from(commitAndMemo, 'hex')) // store in string format for now
+        }
+
+        latestBlockId = block_height + 1
       }
 
-      latestBlockId = block_height
+      newNumTxs += events.length
+      batch += 1
+    } while (events.length == LIMIT)
+
+    if (newNumTxs !== numTxs) {
+      logger.error(`Number of received transactions does not match number of transactions in contract. Expected ${numTxs}, got ${newNumTxs}`)
+      // return
     }
 
     await updateField(RelayerKeys.LATEST_CHECKED_BLOCK, latestBlockId)

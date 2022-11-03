@@ -10,6 +10,7 @@ import { readLatestCheckedBlock, RelayerKeys, updateField } from '../utils/redis
 import { MessageEvent, Chain, TxStatus, PoolCalldata } from './chain';
 import { Pool } from '../pool';
 import { TxPayload } from '../queue/poolTxQueue';
+import { TxType } from 'zp-memo-parser';
 
 // const topic = blake2AsHex('ZeropoolMessage')
 
@@ -19,6 +20,9 @@ const {
 } = process.env as { [key: PropertyKey]: string }
 
 export class PolkadotChain extends Chain {
+  extractCiphertextFromTx(memo: string, txType: TxType): string {
+      throw new Error('Method not implemented.');
+  }
   toBaseUnit(amount: import("bn.js")): import("bn.js") {
       throw new Error('Method not implemented.');
   }

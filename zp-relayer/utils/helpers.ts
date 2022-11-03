@@ -36,19 +36,6 @@ export function numToTxType(num: number): TxType {
   }
 }
 
-const txTypePrefixLen = {
-  [TxType.DEPOSIT]: 16,
-  [TxType.TRANSFER]: 16,
-  // 16 + 16 + 40 + 4
-  [TxType.WITHDRAWAL]: 76,
-  [TxType.PERMITTABLE_DEPOSIT]: 72,
-}
-
-export function truncateMemoTxPrefix(memo: string, txType: TxType) {
-  const txSpecificPrefixLen = txTypePrefixLen[txType]
-  return memo.slice(txSpecificPrefixLen)
-}
-
 export function truncateHexPrefix(data: string) {
   if (data.startsWith('0x')) {
     data = data.slice(2)
