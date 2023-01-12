@@ -16,6 +16,7 @@ import { Chain } from './chains/chain'
 import { NearChain, NearConfig } from './chains/near'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from './utils/redisFields';
 import { ZeropoolIndexer } from './indexer';
+import { WavesChain, WavesConfig } from './chains/waves'
 
 export interface PoolTx {
   proof: Proof
@@ -173,6 +174,13 @@ export async function initPool() {
       }
       chain = await NearChain.create(nearConfig)
       break
+    }
+    case 'waves': {
+      const wavesConfig: WavesConfig = {
+        nodeUrl: config.rpcUrl,
+        poolAddress: config.poolAddress,
+      }
+      chain = await WavesChain.create(wavesConfig)
     }
     default: throw new Error(`Unknown chain '${config.chain}'`)
   }
