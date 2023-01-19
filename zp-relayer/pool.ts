@@ -179,8 +179,12 @@ export async function initPool() {
       const wavesConfig: WavesConfig = {
         nodeUrl: config.rpcUrl,
         poolAddress: config.poolAddress,
+        chainId: 'testnet',
+        assetId: 'WAVES',
+        seed: config.relayerPrivateKey,
       }
       chain = await WavesChain.create(wavesConfig)
+      break
     }
     default: throw new Error(`Unknown chain '${config.chain}'`)
   }
