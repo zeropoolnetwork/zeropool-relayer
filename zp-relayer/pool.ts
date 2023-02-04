@@ -8,7 +8,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './queue/poolTxQueue'
 import { getEvents, getTransaction } from './utils/web3'
-import { Helpers, Params, Proof, SnarkProof, VK } from 'libzkbob-rs-node'
+import { DelegatedDeposit, Helpers, Params, Proof, SnarkProof, VK } from 'libzeropool-rs-node'
 import { validateTx } from './validateTx'
 import { PoolState } from './state'
 

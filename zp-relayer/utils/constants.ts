@@ -1,4 +1,4 @@
-import { Constants } from 'libzkbob-rs-node'
+import { Constants } from 'libzeropool-rs-node'
 
 const constants = {
   FALLBACK_RPC_URL_SWITCH_TIMEOUT: 60 * 60 * 1000,

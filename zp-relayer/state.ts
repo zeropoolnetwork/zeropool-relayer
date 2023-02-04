@@ -1,6 +1,6 @@
 import { logger } from './services/appLogger'
 import { OUTPLUSONE } from './utils/constants'
-import { MerkleTree, TxStorage, MerkleProof, Constants, Helpers } from 'libzkbob-rs-node'
+import { MerkleTree, TxStorage, MerkleProof, Constants, Helpers } from 'libzeropool-rs-node'
 import { NullifierSet } from './nullifierSet'
 
 export class PoolState {

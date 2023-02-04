@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import { toBN, AbiItem } from 'web3-utils'
 import { TxType, TxData, WithdrawTxData, PermittableDepositTxData, getTxData } from 'zp-memo-parser'
-import { Helpers, Proof } from 'libzkbob-rs-node'
+import { Helpers, Proof } from 'libzeropool-rs-node'
 import { logger } from './services/appLogger'
 import config from './config'
 import { Limits, pool, PoolTx } from './pool'

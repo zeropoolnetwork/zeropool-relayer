@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { decodeMemo } from 'zp-memo-parser/memo'
-import { MerkleTree, Constants, Helpers } from 'libzkbob-rs-node'
+import { MerkleTree, Constants, Helpers } from 'libzeropool-rs-node'
 import depositMemo from './depositMemo.json'
 import fs from 'fs'
 import { TxType } from 'zp-memo-parser'

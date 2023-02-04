@@ -10,6 +10,7 @@ export enum TxType {
   TRANSFER = '0001',
   WITHDRAWAL = '0002',
   PERMITTABLE_DEPOSIT = '0003',
+  DELEGATED_DEPOSIT = '0004',
 }
 
 interface DefaultTxData {

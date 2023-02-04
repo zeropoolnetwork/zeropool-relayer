@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import { padLeft, toBN } from 'web3-utils'
 import { logger } from '../services/appLogger'
-import { SnarkProof } from 'libzkbob-rs-node'
+import { SnarkProof } from 'libzeropool-rs-node'
 import { TxType } from 'zp-memo-parser'
 import type { Mutex } from 'async-mutex'
 
@@ -10,7 +10,7 @@ const S_MAX = toBN('0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F4668
 
 export function toTxType(t: string): TxType {
   t = truncateHexPrefix(t)
-  if (t === TxType.DEPOSIT || t === TxType.TRANSFER || t === TxType.WITHDRAWAL || t === TxType.PERMITTABLE_DEPOSIT) {
+  if (t === TxType.DEPOSIT || t === TxType.TRANSFER || t === TxType.WITHDRAWAL || t === TxType.PERMITTABLE_DEPOSIT || t === TxType.DELEGATED_DEPOSIT) {
     return t
   } else {
     throw new Error('incorrect tx type')
@@ -23,6 +23,7 @@ const txTypePrefixLen = {
   // 16 + 16 + 40
   [TxType.WITHDRAWAL]: 72,
   [TxType.PERMITTABLE_DEPOSIT]: 72,
+  [TxType.DELEGATED_DEPOSIT]: 0,
 }
 
 export function truncateMemoTxPrefix(memo: string, txType: TxType) {
