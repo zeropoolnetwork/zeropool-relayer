@@ -19,6 +19,7 @@ import { OUTPLUSONE } from './utils/constants'
 
 export interface PoolTx {
   proof: Proof
+  delegatedDepositProof?: Proof // only for delegated deposits
   memo: string
   txType: TxType
   depositSignature: string | null

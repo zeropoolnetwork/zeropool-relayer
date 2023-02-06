@@ -8,6 +8,7 @@ import { logger } from '../services/appLogger'
 import { DelegatedDeposit, DelegatedDepositData, Params, Proof } from 'libzeropool-rs-node'
 import { pool } from '../pool';
 import { TxType } from 'zp-memo-parser';
+import { ddParams, txParams } from '../prover';
 
 
 
@@ -23,7 +24,6 @@ interface DepositCreateEvent {
 
 // Naive implementation of the worker
 export async function createDelegatedDepositsWorker() {
-  const params = Params.fromFile(config.delegatedDepositParamsPath)
   const contract = new web3.eth.Contract(ddAbi as AbiItem[], config.delegatedDepositsAddress)
   let depositsBuffer: DelegatedDeposit[] = []
 
@@ -53,13 +53,16 @@ export async function createDelegatedDepositsWorker() {
     if (depositsBuffer.length > 0) {
       logger.info("Sending deposits to the queue:", depositsBuffer)
 
-      const dd = new DelegatedDepositData(depositsBuffer)
-      const proof = await Proof.delegatedDepositAsync(params, dd.public, dd.secret)
+      const root = pool.optimisticState.getMerkleRoot()
+      const dd = new DelegatedDepositData(depositsBuffer, root, '0')
+      const proof = await Proof.txAsync(txParams, dd.tx_public, dd.tx_secret)
+      const delegatedDepositProof = await Proof.delegatedDepositAsync(ddParams, dd.public, dd.secret)
       const tx = {
         txType: TxType.DELEGATED_DEPOSIT,
-        proof,
+        delegatedDepositProof,
         memo: dd.memo.toString('hex'),
         depositSignature: null,
+        proof,
       }
 
       pool.transact([tx])
