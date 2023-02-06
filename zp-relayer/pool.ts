@@ -8,7 +8,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './queue/poolTxQueue'
 import { getEvents, getTransaction } from './utils/web3'
-import { DelegatedDeposit, Helpers, Params, Proof, SnarkProof, VK } from 'libzeropool-rs-node'
+import { Helpers, Params, Proof, SnarkProof, VK } from 'libzeropool-rs-node'
 import { validateTx } from './validateTx'
 import { PoolState } from './state'
 
@@ -19,7 +19,6 @@ import { OUTPLUSONE } from './utils/constants'
 
 export interface PoolTx {
   proof: Proof
-  delegatedDepositProof?: Proof // only for delegated deposits
   memo: string
   txType: TxType
   depositSignature: string | null

@@ -23,7 +23,8 @@ const txTypePrefixLen = {
   // 16 + 16 + 40
   [TxType.WITHDRAWAL]: 72,
   [TxType.PERMITTABLE_DEPOSIT]: 72,
-  [TxType.DELEGATED_DEPOSIT]: 0,
+  // 8 + 256
+  [TxType.DELEGATED_DEPOSIT]: 300,
 }
 
 export function truncateMemoTxPrefix(memo: string, txType: TxType) {

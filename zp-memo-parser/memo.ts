@@ -95,6 +95,7 @@ function getNoteHashes(rawHashes: Buffer, num: number, maxNotes: number): Uint8A
   return notes
 }
 
+// TODO: Implement for the DELEGATED_DEPOSIT tx type
 export function getTxData(data: Buffer, txType: Option<TxType>): TxData {
   function readU64(offset: number) {
     let uint = data.readBigUInt64BE(offset)
