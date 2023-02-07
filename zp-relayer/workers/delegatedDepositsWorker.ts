@@ -75,7 +75,7 @@ export async function createDelegatedDepositsWorker() {
       const tx = {
         txType: TxType.DELEGATED_DEPOSIT,
         memo: dd.memo.toString('hex'),
-        depositSignature: null,
+        extraData: null,
         proof,
       }
 

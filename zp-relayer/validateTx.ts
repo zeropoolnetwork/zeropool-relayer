@@ -201,7 +201,7 @@ async function getRecoveredAddress(
   return recoveredAddress
 }
 
-export async function validateTx({ txType, proof, memo, depositSignature }: PoolTx) {
+export async function validateTx({ txType, proof, memo, extraData }: PoolTx) {
   const buf = Buffer.from(memo, 'hex')
   const txData = getTxData(buf, txType)
 
@@ -222,7 +222,7 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
   const requiredTokenAmount = tokenAmountWithFee.mul(pool.denominator)
   let userAddress = ZERO_ADDRESS
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-    userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, depositSignature)
+    userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, extraData)
     await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
   }
 

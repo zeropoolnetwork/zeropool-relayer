@@ -21,7 +21,7 @@ export interface PoolTx {
   proof: Proof
   memo: string
   txType: TxType
-  depositSignature: string | null
+  extraData: string | null
 }
 
 export interface Limits {
@@ -93,7 +93,7 @@ class Pool {
       await validateTx(tx)
     }
 
-    const queueTxs = txs.map(({ proof, txType, memo, depositSignature }) => {
+    const queueTxs = txs.map(({ proof, txType, memo, extraData: depositSignature }) => {
       return {
         amount: '0',
         gas: config.relayerGasLimit.toString(),
