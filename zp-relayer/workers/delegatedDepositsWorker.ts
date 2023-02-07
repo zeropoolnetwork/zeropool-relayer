@@ -1,13 +1,15 @@
 
 import type { AbiItem } from 'web3-utils';
 import { web3 } from '../services/web3'
-import * as ddAbi from '../abi/delegated-deposit-storage.json'
+import ddAbi from '../abi/delegated-deposit-storage.json'
 import config from '../config'
 import { logger } from '../services/appLogger'
 import { DelegatedDeposit, DelegatedDepositData, FullDelegatedDeposit, Params, Proof } from 'libzeropool-rs-node'
 import { pool } from '../pool';
 import { TxType } from 'zp-memo-parser';
 import { ddParams, txParams } from '../prover';
+import { getEvents } from '../utils/web3';
+import { readLatestDDBlock, RelayerKeys, updateField } from '../utils/redisFields';
 
 
 class DepositCreateEvent {
@@ -36,22 +38,34 @@ class DepositCreateEvent {
 // Implement a proper queue for production
 export async function createDelegatedDepositsWorker() {
   const contract = new web3.eth.Contract(ddAbi as AbiItem[], config.delegatedDepositsAddress)
+
   let depositsBuffer: FullDelegatedDeposit[] = []
+  let latestBlock = await readLatestDDBlock() || 0
 
-  let subscription = contract.events.DepositCreate({ fromBlock: 0 })
-    .on('data', (event: DepositCreateEvent) => {
-      logger.info("New DepositCreate event:", event)
-      const deposit = event.toFullDelegatedDeposit()
+  logger.info("Starting delegated deposits listener from block", latestBlock)
 
+  // TODO: Subscribe to events with an appropriate RPC
+  setInterval(async () => {
+    const events = await getEvents(contract, 'DepositCreate', { fromBlock: latestBlock });
+
+    for (const event of events) {
+      const depositEvent = event.returnValues as DepositCreateEvent
+      const deposit = depositEvent.toFullDelegatedDeposit()
+      logger.debug("New DepositCreate event:", event)
+      logger.debug("New DepositCreate event parsed:", deposit)
       depositsBuffer.push(deposit)
-    })
-    .on('changed', (changed: any) => logger.info(changed))
-    .on('error', (err: any) => {
-      logger.error("Error while listening to delegated deposits:", err)
-    })
-    .on('connected', (str: any) => logger.info("Connected to DepositCreate event:", str))
+
+      latestBlock = event.blockNumber
+    }
+
+    if (latestBlock) {
+      await updateField(RelayerKeys.LATEST_DD_BLOCK, latestBlock.toString())
+    }
+  }, config.delegatedDepositsCheckInterval)
 
   setInterval(async () => {
+    logger.debug("No delegated deposits to send, skipping...")
+
     if (depositsBuffer.length > 0) {
       logger.info("Sending deposits to the queue:", depositsBuffer)
 
@@ -70,6 +84,4 @@ export async function createDelegatedDepositsWorker() {
       depositsBuffer = []
     }
   }, config.delegatedDepositsFlushInterval)
-
-  return subscription
 }

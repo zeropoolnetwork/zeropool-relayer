@@ -8,10 +8,12 @@ import { pool } from '../pool'
 export enum RelayerKeys {
   TRANSFER_NUM = 'relayer:transferNum',
   NONCE = `relayer:nonce`,
+  LATEST_DD_BLOCK = 'relayer:latestDDBlock',
 }
 
 export const readNonce = readFieldBuilder(RelayerKeys.NONCE, () => getNonce(web3, config.relayerAddress))
 export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractIndex())
+export const readLatestDDBlock = readFieldBuilder(RelayerKeys.LATEST_DD_BLOCK, () => 0)
 
 function readFieldBuilder(key: RelayerKeys, forceUpdateFunc?: Function) {
   return async (forceUpdate?: boolean) => {

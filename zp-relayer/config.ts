@@ -14,6 +14,7 @@ const config = {
   poolAddress: process.env.POOL_ADDRESS,
   delegatedDepositsAddress: process.env.DELEGATED_DEPOSITS_ADDRESS,
   delegatedDepositsFlushInterval: parseInt(process.env.DELEGATED_DEPOSITS_FLUSH_INTERVAL || '5000'),
+  delegatedDepositsCheckInterval: parseInt(process.env.DELEGATED_DEPOSITS_FLUSH_INTERVAL || '2000'),
   delegatedDepositParamsPath: process.env.DELEGATED_DEPOSIT_PARAMS_PATH || './params/delegated_deposit_params.bin',
   tokenAddress: process.env.TOKEN_ADDRESS,
   relayerGasLimit: toBN(process.env.RELAYER_GAS_LIMIT as string),
