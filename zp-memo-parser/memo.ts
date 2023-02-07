@@ -27,7 +27,12 @@ export interface PermittableDepositTxData extends DefaultTxData {
   holder: Uint8Array
 }
 
-export type TxData = DefaultTxData | WithdrawTxData | PermittableDepositTxData
+export interface DelegatedDepositTxData extends DefaultTxData {
+  delegatedDepositProof: Uint8Array
+  accountHash: Uint8Array
+}
+
+export type TxData = DefaultTxData | WithdrawTxData | PermittableDepositTxData | DelegatedDepositTxData
 
 // Size in bytes
 const U256_SIZE = 32
@@ -121,6 +126,14 @@ export function getTxData(data: Buffer, txType: Option<TxType>): TxData {
       fee,
       deadline,
       holder,
+    }
+  } else if (txType == TxType.DELEGATED_DEPOSIT) {
+    const delegatedDepositProof = new Uint8Array(data.slice(8, 256 + 8))
+    const accountHash = new Uint8Array(data.slice(256 + 8 + 4, 256 + 8 + 32))
+    return {
+      fee,
+      delegatedDepositProof,
+      accountHash,
     }
   }
   return { fee }
