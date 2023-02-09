@@ -3529,10 +3529,10 @@ latest-version@^5.1.0:
   dependencies:
     package-json "^6.3.0"
 
-libzeropool-rs-node@^0.2.2-dd:
-  version "0.2.2-dd"
-  resolved "https://registry.yarnpkg.com/libzeropool-rs-node/-/libzeropool-rs-node-0.2.2-dd.tgz#bab14914fae455f947675a52aad86822030b53fe"
-  integrity sha512-8HVPDIPxlYqsDAGSURRmAchE5FlPcs44tA887+ikAt+my0b2Z7Wut5u6yYLVAOencagTx3zVpsi/bmiaOrw7yw==
+libzeropool-rs-node@^0.3.1-dd:
+  version "0.3.1-dd"
+  resolved "https://registry.yarnpkg.com/libzeropool-rs-node/-/libzeropool-rs-node-0.3.1-dd.tgz#608a7a5bbf6c5f0afaedc59a950446d291d7d40d"
+  integrity sha512-n4rtjY+ihDcc5g1HlU1X5G5O0qKiEmTfLapfywnGNcIxwfcCLzn45uXsTuJpaSb8cacPFYiqgH5m2FplXEpiRw==
   dependencies:
     cargo-cp-artifact "^0.1"
 

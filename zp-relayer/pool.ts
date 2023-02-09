@@ -8,7 +8,7 @@ import { web3 } from './services/web3'
 import { logger } from './services/appLogger'
 import { poolTxQueue } from './queue/poolTxQueue'
 import { getEvents, getTransaction } from './utils/web3'
-import { Helpers, Params, Proof, SnarkProof, VK } from 'libzeropool-rs-node'
+import { DelegatedDepositsData, Helpers, Params, Proof, SnarkProof, VK } from 'libzeropool-rs-node'
 import { validateTx } from './validateTx'
 import { PoolState } from './state'
 
@@ -22,6 +22,7 @@ export interface PoolTx {
   memo: string
   txType: TxType
   extraData: string | null
+  delegatedDeposit: DelegatedDepositsData | null
 }
 
 export interface Limits {
@@ -93,14 +94,15 @@ class Pool {
       await validateTx(tx)
     }
 
-    const queueTxs = txs.map(({ proof, txType, memo, extraData: depositSignature }) => {
+    const queueTxs = txs.map(({ proof, txType, memo, extraData, delegatedDeposit }) => {
       return {
         amount: '0',
         gas: config.relayerGasLimit.toString(),
         txProof: proof,
         txType,
         rawMemo: memo,
-        depositSignature,
+        extraData,
+        delegatedDeposit,
       }
     })
     const job = await poolTxQueue.add('tx', queueTxs)

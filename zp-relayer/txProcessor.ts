@@ -23,7 +23,7 @@ interface TxData {
   delta: Delta
   txType: TxType
   memo: string
-  depositSignature: string | null
+  extraData: string | null
 }
 
 function buildTxData(txData: TxData) {
@@ -55,24 +55,46 @@ function buildTxData(txData: TxData) {
     memoMessage,
   ]
 
-  if (txData.depositSignature) {
-    const signature = truncateHexPrefix(txData.depositSignature)
-    data.push(signature)
+  if (txData.extraData) {
+    const extraData = truncateHexPrefix(txData.extraData)
+    data.push(extraData)
   }
 
   return data.join('')
 }
 
 export async function processTx(id: string, tx: TxPayload, pool: Pool) {
-  const { amount, txProof, txType, rawMemo, depositSignature } = tx
+  const { amount, txProof, txType, rawMemo, extraData } = tx
 
   const logPrefix = `Job ${id}:`
 
   logger.info(`${logPrefix} Recieved ${txType} tx with ${amount} native amount`)
 
-  const delta = parseDelta(txProof.inputs[3])
+  let delta: Delta
+  if (txType == TxType.DELEGATED_DEPOSIT) {
+    delta = {
+      transferIndex: toBN(0),
+      energyAmount: toBN(0),
+      tokenAmount: toBN(0),
+      poolId: toBN(0),
+    }
+  } else {
+    delta = parseDelta(txProof.inputs[3])
+  }
 
-  const outCommit = txProof.inputs[2]
+  let nullifier
+  if (txType == TxType.DELEGATED_DEPOSIT) {
+    nullifier = toBN(0)
+  } else {
+    nullifier = toBN(txProof.inputs[1])
+  }
+
+  let outCommit
+  if (txType == TxType.DELEGATED_DEPOSIT) {
+    outCommit = tx.delegatedDeposit!.secret.out_commitment_hash
+  } else {
+    outCommit = txProof.inputs[2]
+  }
   const { pub, sec, commitIndex } = pool.optimisticState.getVirtualTreeProofInputs(outCommit)
 
   logger.debug(`${logPrefix} Proving tree...`)
@@ -82,13 +104,13 @@ export async function processTx(id: string, tx: TxPayload, pool: Pool) {
   const data = buildTxData({
     txProof: txProof.proof,
     treeProof: treeProof.proof,
-    nullifier: numToHex(toBN(txProof.inputs[1])),
-    outCommit: numToHex(toBN(treeProof.inputs[2])),
+    nullifier: numToHex(nullifier),
+    outCommit: numToHex(toBN(outCommit)),
     rootAfter: numToHex(toBN(treeProof.inputs[1])),
     delta,
     txType,
     memo: rawMemo,
-    depositSignature,
+    extraData,
   })
   return { data, commitIndex }
 }
