@@ -1,6 +1,6 @@
 import Ajv, { JSONSchemaType } from 'ajv'
 import { isAddress } from 'web3-utils'
-import { Proof, SnarkProof } from 'libzeropool-rs-node'
+import { DelegatedDeposit, DelegatedDepositBatchSec, DelegatedDepositsData, Proof, SnarkProof } from 'libzeropool-rs-node'
 import { TxType } from 'zp-memo-parser'
 import type { PoolTx } from '../pool'
 import { ZERO_ADDRESS } from '../utils/constants'
@@ -60,6 +60,11 @@ const AjvProofSchema: JSONSchemaType<Proof> = {
   required: ['inputs', 'proof'],
 }
 
+const AjvDelegatedDepositsDataSchema: JSONSchemaType<DelegatedDepositsData> = {
+  type: 'object',
+  required: [],
+}
+
 const AjvSendTransactionSchema: JSONSchemaType<PoolTx> = {
   type: 'object',
   properties: {
@@ -67,9 +72,10 @@ const AjvSendTransactionSchema: JSONSchemaType<PoolTx> = {
     memo: AjvString,
     txType: {
       type: 'string',
-      enum: [TxType.DEPOSIT, TxType.PERMITTABLE_DEPOSIT, TxType.TRANSFER, TxType.WITHDRAWAL],
+      enum: [TxType.DEPOSIT, TxType.PERMITTABLE_DEPOSIT, TxType.TRANSFER, TxType.WITHDRAWAL, TxType.DELEGATED_DEPOSIT],
     },
     extraData: { type: 'string', nullable: true },
+    delegatedDeposit: AjvDelegatedDepositsDataSchema,
   },
   required: ['proof', 'memo', 'txType'],
 }

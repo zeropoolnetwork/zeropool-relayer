@@ -52,6 +52,7 @@ export async function createDelegatedDepositsWorker() {
   // Listen to the DepositCreate events and aggregate deposits
   setTimeout(async () => {
     let latestBlock = parseInt(await readLatestDDBlock() || '0')
+    // let latestBlock = 0
 
     logger.info("Starting delegated deposits listener from block", latestBlock)
 
@@ -96,9 +97,10 @@ export async function createDelegatedDepositsWorker() {
 
       const release = await bufferMutex.acquire()
       try {
-        logger.info("Sending deposits to the queue:", depositsBuffer)
-        const dd = await bufferMutex.runExclusive(async () => await DelegatedDepositsData.create(depositsBuffer))
-        const proof = await Proof.delegatedDepositAsync(txParams, dd.public, dd.secret)
+        console.log("Sending deposits to the queue:", depositsBuffer)
+
+        const dd = await await DelegatedDepositsData.create(depositsBuffer)
+        const proof = await Proof.delegatedDepositAsync(ddParams, dd.public, dd.secret)
         const tx = {
           txType: TxType.DELEGATED_DEPOSIT,
           memo: dd.memo.toString('hex'),

@@ -66,8 +66,8 @@ async function sendTransaction(req: Request, res: Response, next: NextFunction) 
     return
   }
 
-  const { proof, memo, txType, extraData } = req.body
-  const tx = [{ proof, memo, txType, extraData }]
+  const { proof, memo, txType, extraData, delegatedDeposit } = req.body
+  const tx = [{ proof, memo, txType, extraData, delegatedDeposit }]
   const jobId = await pool.transact(tx)
   res.json({ jobId })
 }

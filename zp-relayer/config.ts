@@ -22,6 +22,7 @@ const config = {
   maxFaucet: toBN(process.env.MAX_NATIVE_AMOUNT_FAUCET as string),
   treeUpdateParamsPath: process.env.TREE_UPDATE_PARAMS_PATH || './params/tree_params.bin',
   txVKPath: process.env.TX_VK_PATH || './params/transfer_verification_key.json',
+  ddVKPath: process.env.DD_VK_PATH || './params/delegated_deposit_verification_key.json',
   gasPriceFallback: process.env.GAS_PRICE_FALLBACK as string,
   gasPriceEstimationType: (process.env.GAS_PRICE_ESTIMATION_TYPE as EstimationType) || 'web3',
   gasPriceUpdateInterval: parseInt(process.env.GAS_PRICE_UPDATE_INTERVAL || '5000'),

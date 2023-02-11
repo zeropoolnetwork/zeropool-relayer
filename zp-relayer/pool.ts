@@ -64,7 +64,7 @@ export interface LimitsFetch {
 class Pool {
   public PoolInstance: Contract
   public treeParams: Params
-  private txVK: VK
+
   public state: PoolState
   public optimisticState: PoolState
   public denominator: BN = toBN(1)
@@ -74,8 +74,6 @@ class Pool {
     this.PoolInstance = new web3.eth.Contract(PoolAbi as AbiItem[], config.poolAddress)
 
     this.treeParams = Params.fromFile(config.treeUpdateParamsPath)
-    const txVK = require(config.txVKPath)
-    this.txVK = txVK
 
     this.state = new PoolState('pool')
     this.optimisticState = new PoolState('optimistic')
@@ -180,10 +178,6 @@ class Pool {
     }
 
     logger.debug(`LOCAL ROOT AFTER UPDATE ${this.state.getMerkleRoot()}`)
-  }
-
-  verifyProof(proof: SnarkProof, inputs: Array<string>) {
-    return Proof.verify(this.txVK, proof, inputs)
   }
 
   async getContractIndex() {

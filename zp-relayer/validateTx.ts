@@ -49,8 +49,18 @@ export function checkCommitment(treeProof: Proof, txProof: Proof) {
   return treeProof.inputs[2] === txProof.inputs[2]
 }
 
-export function checkTxProof(txProof: Proof) {
-  const res = pool.verifyProof(txProof.proof, txProof.inputs)
+const txVK = require(config.txVKPath)
+const ddVK = require(config.ddVKPath)
+
+export function checkTxProof(txProof: Proof, txType: TxType) {
+  let vk = txVK
+  if (txType === TxType.DELEGATED_DEPOSIT) {
+    vk = ddVK
+  }
+
+  console.log(txType)
+
+  const res = Proof.verify(vk, txProof.proof, txProof.inputs)
   if (!res) {
     return new Error('Incorrect transfer proof')
   }
@@ -212,7 +222,7 @@ export async function validateTx({ txType, proof, memo, extraData }: PoolTx) {
     await checkAssertion(() => checkNativeAmount(nativeAmount))
   }
 
-  await checkAssertion(() => checkTxProof(proof))
+  await checkAssertion(() => checkTxProof(proof, txType))
 
   const delta = parseDelta(proof.inputs[3])
 
