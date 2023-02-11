@@ -188,7 +188,13 @@
       }
     ],
     "name": "deposit",
-    "outputs": [],
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "id",
+        "type": "uint64"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -249,24 +255,55 @@
       }
     ],
     "name": "depositWithPermit",
-    "outputs": [],
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "id",
+        "type": "uint64"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
       {
-        "internalType": "bytes32",
+        "internalType": "uint64",
         "name": "",
-        "type": "bytes32"
+        "type": "uint64"
       }
     ],
     "name": "deposits",
     "outputs": [
       {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes10",
+        "name": "receiver_d",
+        "type": "bytes10"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "receiver_p",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint64",
+        "name": "denominated_amount",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "denominated_fee",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "expired",
+        "type": "uint64"
       }
     ],
     "stateMutability": "view",
@@ -288,46 +325,9 @@
   {
     "inputs": [
       {
-        "components": [
-          {
-            "internalType": "uint64",
-            "name": "id",
-            "type": "uint64"
-          },
-          {
-            "internalType": "address",
-            "name": "owner",
-            "type": "address"
-          },
-          {
-            "internalType": "bytes10",
-            "name": "receiver_d",
-            "type": "bytes10"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "receiver_p",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "uint64",
-            "name": "denominated_amount",
-            "type": "uint64"
-          },
-          {
-            "internalType": "uint64",
-            "name": "denominated_fee",
-            "type": "uint64"
-          },
-          {
-            "internalType": "uint64",
-            "name": "expired",
-            "type": "uint64"
-          }
-        ],
-        "internalType": "struct DelegatedDepositStorage.Deposit",
-        "name": "_deposit",
-        "type": "tuple"
+        "internalType": "uint64",
+        "name": "id",
+        "type": "uint64"
       }
     ],
     "name": "releaseExpired",
@@ -339,7 +339,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "prefix",
+        "name": "out_commitment_hash",
         "type": "uint256"
       },
       {
