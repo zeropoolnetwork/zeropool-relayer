@@ -52,19 +52,25 @@ export async function createDelegatedDepositsWorker() {
   // Listen to the DepositCreate events and aggregate deposits
   setTimeout(async () => {
     let latestBlock = parseInt(await readLatestDDBlock() || '0')
-    // let latestBlock = 0
 
     logger.info("Starting delegated deposits listener from block", latestBlock)
 
     while (true) {
       try {
-
-        console.log("Latest block:", latestBlock)
-        const events = await getEvents(contract, 'DepositCreate', { fromBlock: latestBlock + 1, toBlock: 'latest' });
+        const events = await getEvents(contract, 'DepositCreate', { fromBlock: latestBlock + 1, toBlock: 'latest' })
 
         for (const event of events) {
           const depositEvent = new DepositCreateEvent(event.returnValues)
           const deposit = depositEvent.toFullDelegatedDeposit()
+          const contractDeposit = await contract.methods.deposits(deposit.id).call();
+
+          if (contractDeposit.owner === '0x0000000000000000000000000000000000000000') {
+            logger.debug(`Skipping spent deposit: ${deposit.id}`)
+            continue
+          } else {
+            logger.info(`Found unspent deposit: ${deposit.id}`)
+          }
+
           if (event.blockNumber > latestBlock) {
             await bufferMutex.runExclusive(() => {
               depositsBuffer.push(deposit)
@@ -78,7 +84,7 @@ export async function createDelegatedDepositsWorker() {
           latestBlock = event.blockNumber
         }
       } catch (err) {
-        logger.error("Error while listening to the DepositCreate events:", err)
+        logger.error(`Error while listening to the DepositCreate events: ${err}`, err)
       }
 
       await new Promise(resolve => setTimeout(resolve, config.delegatedDepositsCheckInterval))
@@ -97,7 +103,7 @@ export async function createDelegatedDepositsWorker() {
 
       const release = await bufferMutex.acquire()
       try {
-        console.log("Sending deposits to the queue:", depositsBuffer)
+        logger.info(`Sending ${depositsBuffer.length} delegated deposits to the queue`)
 
         const dd = await await DelegatedDepositsData.create(depositsBuffer)
         const proof = await Proof.delegatedDepositAsync(ddParams, dd.public, dd.secret)

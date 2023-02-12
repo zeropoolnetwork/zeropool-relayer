@@ -61,9 +61,11 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
         delta = parseDelta(txProof.inputs[3])
       }
 
-      await checkAssertion(() => checkNullifier(nullifier, pool.state.nullifiers))
-      await checkAssertion(() => checkNullifier(nullifier, pool.optimisticState.nullifiers))
-      await checkAssertion(() => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex))
+      if (txType != TxType.DELEGATED_DEPOSIT) {
+        await checkAssertion(() => checkNullifier(nullifier, pool.state.nullifiers))
+        await checkAssertion(() => checkNullifier(nullifier, pool.optimisticState.nullifiers))
+        await checkAssertion(() => checkTransferIndex(toBN(pool.optimisticState.getNextIndex()), delta.transferIndex))
+      }
 
       const { data, commitIndex } = await processTx(job.id as string, tx, pool)
 
