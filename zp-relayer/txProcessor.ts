@@ -91,7 +91,7 @@ export async function processTx(id: string, tx: TxPayload, pool: Pool) {
 
   let outCommit
   if (txType == TxType.DELEGATED_DEPOSIT) {
-    outCommit = tx.delegatedDeposit!.secret.out_commitment_hash
+    outCommit = tx.delegatedDeposit!.out_commitment_hash
   } else {
     outCommit = txProof.inputs[2]
   }

@@ -12,10 +12,11 @@ import { sentTxQueue } from '../queue/sentTxQueue'
 import { processTx } from '../txProcessor'
 import config from '../config'
 import { redis } from '../services/redisClient'
-import { checkAssertion, checkLimits, checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
+import { checkAssertion, checkLimits, checkNullifier, checkTransferIndex, Delta, parseDelta } from '../validateTx'
 import type { EstimationType, GasPrice } from '../services/GasPrice'
 import type { Mutex } from 'async-mutex'
 import { getChainId } from '../utils/web3'
+import { TxType } from 'zp-memo-parser'
 
 const WORKER_OPTIONS = {
   autorun: false,
@@ -34,11 +35,31 @@ export async function createPoolTxWorker<T extends EstimationType>(gasPrice: Gas
 
     const txHashes = []
     for (const tx of txs) {
-      const { gas, amount, rawMemo, txType, txProof } = tx
+      const { gas, amount, rawMemo, txType, txProof, delegatedDeposit } = tx
 
-      const nullifier = txProof.inputs[1]
-      const outCommit = txProof.inputs[2]
-      const delta = parseDelta(txProof.inputs[3])
+      let nullifier: string
+      if (txType == TxType.DELEGATED_DEPOSIT) {
+        nullifier = '0'
+      } else {
+        nullifier = txProof.inputs[1]
+      }
+      let outCommit: string
+      if (txType == TxType.DELEGATED_DEPOSIT) {
+        outCommit = delegatedDeposit!.out_commitment_hash
+      } else {
+        outCommit = txProof.inputs[2]
+      }
+      let delta: Delta
+      if (txType == TxType.DELEGATED_DEPOSIT) {
+        delta = {
+          transferIndex: toBN(0),
+          energyAmount: toBN(0),
+          tokenAmount: toBN(0),
+          poolId: toBN(0),
+        }
+      } else {
+        delta = parseDelta(txProof.inputs[3])
+      }
 
       await checkAssertion(() => checkNullifier(nullifier, pool.state.nullifiers))
       await checkAssertion(() => checkNullifier(nullifier, pool.optimisticState.nullifiers))

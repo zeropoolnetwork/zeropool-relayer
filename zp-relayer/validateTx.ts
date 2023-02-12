@@ -58,8 +58,6 @@ export function checkTxProof(txProof: Proof, txType: TxType) {
     vk = ddVK
   }
 
-  console.log(txType)
-
   const res = Proof.verify(vk, txProof.proof, txProof.inputs)
   if (!res) {
     return new Error('Incorrect transfer proof')
@@ -224,16 +222,18 @@ export async function validateTx({ txType, proof, memo, extraData }: PoolTx) {
 
   await checkAssertion(() => checkTxProof(proof, txType))
 
-  const delta = parseDelta(proof.inputs[3])
+  if (txType !== TxType.DELEGATED_DEPOSIT) {
+    const delta = parseDelta(proof.inputs[3])
 
-  const tokenAmountWithFee = delta.tokenAmount.add(txData.fee)
-  await checkAssertion(() => checkTxSpecificFields(txType, tokenAmountWithFee, delta.energyAmount, txData, toBN('0')))
+    const tokenAmountWithFee = delta.tokenAmount.add(txData.fee)
+    await checkAssertion(() => checkTxSpecificFields(txType, tokenAmountWithFee, delta.energyAmount, txData, toBN('0')))
 
-  const requiredTokenAmount = tokenAmountWithFee.mul(pool.denominator)
-  let userAddress = ZERO_ADDRESS
-  if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-    userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, extraData)
-    await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
+    const requiredTokenAmount = tokenAmountWithFee.mul(pool.denominator)
+    let userAddress = ZERO_ADDRESS
+    if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
+      userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, extraData)
+      await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
+    }
   }
 
   // const limits = await pool.getLimitsFor(userAddress)
