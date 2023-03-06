@@ -164,15 +164,15 @@ async function getRecoveredAddress(
   proofNullifier: string,
   txData: TxData,
   tokenAmount: BN,
-  depositSignature: string | null
+  extraData: string | null
 ) {
   // Signature without `0x` prefix, size is 64*2=128
   await checkAssertion(() => {
-    if (depositSignature !== null && checkSize(depositSignature, 128)) return null
+    if (extraData !== null && checkSize(extraData, 128)) return null
     return new Error('Invalid deposit signature')
   })
   const nullifier = '0x' + numToHex(toBN(proofNullifier))
-  const sig = unpackSignature(depositSignature as string)
+  const sig = unpackSignature(extraData as string)
 
   let recoveredAddress: string
   if (txType === TxType.DEPOSIT) {
@@ -201,7 +201,7 @@ async function getRecoveredAddress(
   return recoveredAddress
 }
 
-export async function validateTx({ txType, proof, memo, depositSignature }: PoolTx) {
+export async function validateTx({ txType, proof, memo, extraData }: PoolTx) {
   const buf = Buffer.from(memo, 'hex')
   const txData = getTxData(buf, txType)
 
@@ -222,7 +222,7 @@ export async function validateTx({ txType, proof, memo, depositSignature }: Pool
   const requiredTokenAmount = tokenAmountWithFee.mul(pool.denominator)
   let userAddress = ZERO_ADDRESS
   if (txType === TxType.DEPOSIT || txType === TxType.PERMITTABLE_DEPOSIT) {
-    userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, depositSignature)
+    userAddress = await getRecoveredAddress(txType, proof.inputs[1], txData, requiredTokenAmount, extraData)
     await checkAssertion(() => checkDepositEnoughBalance(userAddress, requiredTokenAmount))
   }
 

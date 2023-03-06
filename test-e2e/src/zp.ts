@@ -109,7 +109,7 @@ interface SendTx {
   proof: any
   memo: string
   txType: string
-  depositSignature: string | null
+  extraData: string | null
 }
 
 async function proofTx(mergeTx: any, fake: boolean) {
@@ -163,12 +163,12 @@ export async function deposit(account: UserAccount, amount: string, pk: string, 
     amount,
   }
   const mergeTx = await account.createDeposit(deposit)
-  const depositSignature = packSignature(web3.eth.accounts.sign(numToHex(web3, mergeTx.public.nullifier), pk))
+  const extraData = packSignature(web3.eth.accounts.sign(numToHex(web3, mergeTx.public.nullifier), pk))
   const proof = await proofTx(mergeTx, fake)
   return {
     proof,
     memo: mergeTx.memo,
-    depositSignature,
+    extraData,
     txType: '0000',
   }
 }
@@ -185,7 +185,7 @@ export async function transfer(account: UserAccount, to: string, amount: string,
   return {
     proof,
     memo: mergeTx.memo,
-    depositSignature: null,
+    extraData: null,
     txType: '0001',
   }
 }
@@ -210,7 +210,7 @@ export async function withdraw(
   return {
     proof,
     memo: mergeTx.memo,
-    depositSignature: null,
+    extraData: null,
     txType: '0002',
   }
 }

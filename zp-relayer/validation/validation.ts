@@ -69,7 +69,7 @@ const AjvSendTransactionSchema: JSONSchemaType<PoolTx> = {
       type: 'string',
       enum: [TxType.DEPOSIT, TxType.PERMITTABLE_DEPOSIT, TxType.TRANSFER, TxType.WITHDRAWAL],
     },
-    depositSignature: { type: 'string', nullable: true },
+    extraData: { type: 'string', nullable: true },
   },
   required: ['proof', 'memo', 'txType'],
 }

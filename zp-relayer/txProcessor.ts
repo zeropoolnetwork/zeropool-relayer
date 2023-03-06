@@ -23,7 +23,7 @@ interface TxData {
   delta: Delta
   txType: TxType
   memo: string
-  depositSignature: string | null
+  extraData: string | null
 }
 
 function buildTxData(txData: TxData) {
@@ -55,8 +55,8 @@ function buildTxData(txData: TxData) {
     memoMessage,
   ]
 
-  if (txData.depositSignature) {
-    const signature = truncateHexPrefix(txData.depositSignature)
+  if (txData.extraData) {
+    const signature = truncateHexPrefix(txData.extraData)
     data.push(signature)
   }
 
@@ -64,7 +64,7 @@ function buildTxData(txData: TxData) {
 }
 
 export async function processTx(id: string, tx: TxPayload, pool: Pool) {
-  const { amount, txProof, txType, rawMemo, depositSignature } = tx
+  const { amount, txProof, txType, rawMemo, extraData } = tx
 
   const logPrefix = `Job ${id}:`
 
@@ -88,7 +88,7 @@ export async function processTx(id: string, tx: TxPayload, pool: Pool) {
     delta,
     txType,
     memo: rawMemo,
-    depositSignature,
+    extraData,
   })
   return { data, commitIndex }
 }

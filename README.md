@@ -60,7 +60,7 @@ Recieved:
     proof, // TX proof
     memo, // memo block
     txType, // 0 - Deposit, 1 - Transfer, 2 - Withdraw
-    depositSignature // Optional nullifier signature for Depost
+    extraData // Optional nullifier signature for Depost
 }
 ```
 
@@ -118,6 +118,6 @@ You can use already implemented [client](https://github.com/zeropoolnetwork/libz
 
 8. Generate a proof for this tx object either with `Proof.tx` method or request it from relayer `/proof_tx` (only for testing).
 
-9. Send `proof`, `memo` (get it from `tx_object.memo`), `txType` (`0..2`) and `depositSignature` to `/transaction` endpoint.
+9. Send `proof`, `memo` (get it from `tx_object.memo`), `txType` (`0..2`) and `extraData` to `/transaction` endpoint.
 
 You can check more details in `test-e2e` example
