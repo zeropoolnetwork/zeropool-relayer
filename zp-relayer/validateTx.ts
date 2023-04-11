@@ -40,6 +40,7 @@ export async function checkBalance(address: string, minBalance: string) {
   const balance = await tokenContract.methods.balanceOf(address).call()
   const res = toBN(balance).gte(toBN(minBalance))
   if (!res) {
+    logger.debug(`Address ${address} current balance: ${balance}, min balance: ${minBalance}`)
     return new Error('Not enough balance for deposit')
   }
   return null
@@ -164,15 +165,17 @@ async function getRecoveredAddress(
   proofNullifier: string,
   txData: TxData,
   tokenAmount: BN,
-  extraData: string | null
+  signature: string | null
 ) {
   // Signature without `0x` prefix, size is 64*2=128
   await checkAssertion(() => {
-    if (extraData !== null && checkSize(extraData, 128)) return null
+    if (signature !== null && checkSize(signature, 128)) return null
     return new Error('Invalid deposit signature')
   })
   const nullifier = '0x' + numToHex(toBN(proofNullifier))
-  const sig = unpackSignature(extraData as string)
+  const sig = unpackSignature(signature as string)
+
+  console.log('Recovering address. nullifier:', nullifier, 'signature:', signature, 'unpacked signature:', sig)
 
   let recoveredAddress: string
   if (txType === TxType.DEPOSIT) {

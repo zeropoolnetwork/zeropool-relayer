@@ -25,6 +25,7 @@ const config = {
   redisUrl: process.env.RELAYER_REDIS_URL,
   rpcUrl: process.env.RPC_URL as string,
   sentTxDelay: parseInt(process.env.SENT_TX_DELAY || '30000'),
+  mockProver: process.env.MOCK_PROVER === 'true',
 }
 
 export default config

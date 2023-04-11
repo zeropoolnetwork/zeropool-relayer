@@ -8,6 +8,7 @@ import { numToHex, flattenProof, truncateHexPrefix } from './utils/helpers'
 import { SnarkProof, Proof } from 'libzkbob-rs-node'
 import { TxType } from 'zp-memo-parser'
 import type { Pool } from './pool'
+import config from './config'
 
 import { Delta, parseDelta } from './validateTx'
 
@@ -76,15 +77,28 @@ export async function processTx(id: string, tx: TxPayload, pool: Pool) {
   const { pub, sec, commitIndex } = pool.optimisticState.getVirtualTreeProofInputs(outCommit)
 
   logger.debug(`${logPrefix} Proving tree...`)
-  const treeProof = await Proof.treeAsync(pool.treeParams, pub, sec)
+  let treeProof
+  if (config.mockProver) {
+    treeProof = {
+      inputs: ['0', '0', '0'],
+      proof: {
+        a: ['0', '0'],
+        b: [['0', '0'], ['0', '0']],
+        c: ['0', '0'],
+      }
+    }
+  } else {
+    treeProof = await Proof.treeAsync(pool.treeParams, pub, sec)
+  }
   logger.debug(`${logPrefix} Tree proved`)
 
   const data = buildTxData({
     txProof: txProof.proof,
+    // @ts-ignore
     treeProof: treeProof.proof,
     nullifier: numToHex(toBN(txProof.inputs[1])),
-    outCommit: numToHex(toBN(treeProof.inputs[2])),
-    rootAfter: numToHex(toBN(treeProof.inputs[1])),
+    outCommit: numToHex(toBN(treeProof!.inputs[2])),
+    rootAfter: numToHex(toBN(treeProof!.inputs[1])),
     delta,
     txType,
     memo: rawMemo,

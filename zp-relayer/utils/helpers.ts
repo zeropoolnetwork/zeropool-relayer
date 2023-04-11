@@ -26,6 +26,7 @@ const txTypePrefixLen = {
 }
 
 export function truncateMemoTxPrefix(memo: string, txType: TxType) {
+  // @ts-ignore
   const txSpecificPrefixLen = txTypePrefixLen[txType]
   return memo.slice(txSpecificPrefixLen)
 }
