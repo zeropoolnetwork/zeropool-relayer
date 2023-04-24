@@ -1,8 +1,8 @@
 import { logger } from '../services/appLogger'
 import { redis } from '../services/redisClient'
-import { web3 } from '../services/web3'
-import config from '../config'
-import { getNonce } from './web3'
+// import { web3 } from '../services/web3'
+// import config from '../config'
+// import { getNonce } from './web3'
 import { pool } from '../pool'
 
 export enum RelayerKeys {
@@ -11,7 +11,7 @@ export enum RelayerKeys {
   LATEST_CHECKED_BLOCK = `relayer:latestCheckedBlock`,
 }
 
-export const readNonce = readFieldBuilder(RelayerKeys.NONCE, () => getNonce(web3, config.relayerAddress))
+export const readNonce = readFieldBuilder(RelayerKeys.NONCE, () => 0)
 export const readTransferNum = readFieldBuilder(RelayerKeys.TRANSFER_NUM, () => pool.getContractIndex())
 export const readLatestCheckedBlock = readFieldBuilder(RelayerKeys.LATEST_CHECKED_BLOCK, () => 0)
 
