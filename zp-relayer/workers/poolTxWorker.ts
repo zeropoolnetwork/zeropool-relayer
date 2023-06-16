@@ -76,6 +76,9 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
 
         await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
 
+        const chainTx = await pool.chain.getTx(txHash)
+        pool.txCache.add(chainTx)
+
         const truncatedMemo = pool.chain.extractCiphertextFromTx(rawMemo, txType)
         const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
         const txData = numToHex(toBN(outCommit)).concat(hexTxHash).concat(truncatedMemo)

@@ -77,6 +77,9 @@ export async function createSentTxWorker<T extends EstimationType>(mutex: Mutex,
       // Successful
       logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockId)
 
+      const chainTx = await pool.chain.getTx(txHash)
+      pool.txCache.add(chainTx)
+
       pool.state.updateState(commitIndex, outCommit, txData)
 
       // Add nullifer to confirmed state and remove from optimistic one

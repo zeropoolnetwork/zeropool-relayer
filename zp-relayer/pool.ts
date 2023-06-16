@@ -1,3 +1,5 @@
+import fs from 'fs'
+
 import './env'
 import BN from 'bn.js'
 import { toBN } from 'web3-utils'
@@ -17,6 +19,7 @@ import { NearChain, NearConfig } from './chains/near'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from './utils/redisFields';
 import { ZeropoolIndexer } from './indexer';
 import { WavesChain, WavesConfig } from './chains/waves'
+import { TxCache } from './txCache'
 
 export interface PoolTx {
   proof: Proof
@@ -31,9 +34,9 @@ class Pool {
   public state: PoolState = null!
   public optimisticState: PoolState = null!
   public chain: Chain = null!
-  public indexer: ZeropoolIndexer = null!
+  public txCache: TxCache = null!
 
-  static async create(chain: Chain, indexer: ZeropoolIndexer): Promise<Pool> {
+  static async create(chain: Chain): Promise<Pool> {
     const self = new Pool()
 
     self.treeParams = Params.fromFile(config.treeUpdateParamsPath)
@@ -42,7 +45,7 @@ class Pool {
     self.state = new PoolState(`${config.storagePrefix || config.chain}.${config.tokenAddress}.pool`)
     self.optimisticState = new PoolState(`${config.storagePrefix || config.chain}.${config.tokenAddress}.optimistic`)
     self.chain = chain
-    self.indexer = indexer
+    self.txCache = new TxCache('transactions.json')
 
     await self.syncState()
     return self
@@ -89,48 +92,34 @@ class Pool {
     let latestBlockId = fromBlock
     const numTxs = Math.floor((contractIndex - localIndex) / OUTPLUSONE)
 
+    const txs = this.txCache.load()
 
-    const LIMIT = 100
+    if (txs.length !== numTxs) {
+      logger.error(`Number of loaded transactions does not match number of transactions in contract. Expected ${numTxs}, got ${txs.length}`)
+    }
 
-    let newNumTxs = 0
-    let batch = 0
-    let events
-    do {
-      events = await this.indexer.getTransactions({ block_height: latestBlockId, limit: LIMIT })
+    for (let i = 0; i < txs.length; i++) {
+      let tx = txs[i]
 
-      logger.debug(`Found ${events.length} events from block ${fromBlock}`)
-
-      for (let i = 0; i < events.length; i++) {
-        const { calldata, hash, block_height } = events[i]
-        const poolCalldata = this.chain.parseCalldata(calldata)
-
-        await this.state.nullifiers.add([poolCalldata.nullifier.toString()])
-
-        const outCommit = poolCalldata.outCommit
-        const txTypeRaw = poolCalldata.txType
-        const txType = numToTxType(txTypeRaw)
-
-        const memoRaw = Buffer.from(poolCalldata.memo).toString('hex')
-
-        const truncatedMemo = this.chain.extractCiphertextFromTx(memoRaw, txType)
-        const commitAndMemo = this.chain.prepareTxForStorage(outCommit, hash, truncatedMemo)
-
-        const index = localIndex + (batch * LIMIT + i) * OUTPLUSONE
-        for (let state of [this.state, this.optimisticState]) {
-          state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
-          state.addTx(index, Buffer.from(commitAndMemo, 'hex')) // store in string format for now
-        }
-
-        latestBlockId = block_height + 1
+      if (!tx.calldata) {
+        throw new Error(`Invalid transaction in cache: ${JSON.stringify(tx)}`)
       }
 
-      newNumTxs += events.length
-      batch += 1
-    } while (events.length == LIMIT)
+      const index = localIndex + i * OUTPLUSONE
 
-    if (newNumTxs !== numTxs) {
-      logger.error(`Number of received transactions does not match number of transactions in contract. Expected ${numTxs}, got ${newNumTxs}`)
-      // return
+      const poolCalldata = this.chain.parseCalldata(tx.calldata)
+      await this.state.nullifiers.add([poolCalldata.nullifier.toString()])
+      const outCommit = poolCalldata.outCommit
+      const txTypeRaw = poolCalldata.txType
+      const txType = numToTxType(txTypeRaw)
+      const memoRaw = Buffer.from(poolCalldata.memo).toString('hex')
+      const truncatedMemo = this.chain.extractCiphertextFromTx(memoRaw, txType)
+      const commitAndMemo = this.chain.prepareTxForStorage(outCommit, tx.hash, truncatedMemo)
+
+      for (let state of [this.state, this.optimisticState]) {
+        state.addCommitment(Math.floor(index / OUTPLUSONE), Helpers.strToNum(outCommit.toString()))
+        state.addTx(index, Buffer.from(commitAndMemo, 'hex')) // store in string format for now
+      }
     }
 
     await updateField(RelayerKeys.LATEST_CHECKED_BLOCK, latestBlockId)
@@ -175,19 +164,17 @@ export async function initPool() {
       chain = await NearChain.create(nearConfig)
       break
     }
-    case 'waves': {
-      const wavesConfig: WavesConfig = {
-        nodeUrl: config.rpcUrl,
-        poolAddress: config.poolAddress,
-      }
-      chain = await WavesChain.create(wavesConfig)
-    }
+    // case 'waves': {
+    //   const wavesConfig: WavesConfig = {
+    //     nodeUrl: config.rpcUrl,
+    //     poolAddress: config.poolAddress,
+    //   }
+    //   chain = await WavesChain.create(wavesConfig)
+    // }
     default: throw new Error(`Unknown chain '${config.chain}'`)
   }
 
-  const indexer = new ZeropoolIndexer(config.indexerUrl)
-
-  pool = await Pool.create(chain, indexer)
+  pool = await Pool.create(chain)
 }
 
 export type { Pool }

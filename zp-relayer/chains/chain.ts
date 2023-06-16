@@ -46,6 +46,10 @@ export abstract class Chain {
     throw new Error('Not implemented')
   }
 
+  getTx(txId: string): Promise<any> {
+    throw new Error('Not implemented')
+  }
+
   abstract extractCiphertextFromTx(memo: string, txType: TxType): string
 }
 

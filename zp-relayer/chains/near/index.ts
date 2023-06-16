@@ -4,7 +4,8 @@ import {
   KeyPair,
   Near,
   Contract,
-  Account
+  Account,
+  providers,
 } from 'near-api-js'
 import { FinalExecutionStatusBasic } from 'near-api-js/lib/providers'
 import { BinaryWriter, BinaryReader } from '../../utils/binary'
@@ -184,6 +185,31 @@ export class NearChain extends Chain {
     return {
       status,
       blockId: result.transaction
+    }
+  }
+
+  async getTx(txId: string): Promise<any> {
+    const provider = new providers.JsonRpcProvider({ url: 'https://archival-rpc.testnet.near.org' });
+    const tx = await provider.txStatus(txId, this.config.relayerAccountId);
+    // @ts-ignore block_hash is not present in the type definition even though it is in the response.
+    const block = await provider.block({ blockId: tx.transaction_outcome.block_hash });
+
+    const action = tx.transaction.actions.find((a: any) => !!a['FunctionCall'] && a['FunctionCall'].method_name == 'transact');
+    if (!action) {
+      throw new Error('No transact action found');
+    }
+
+    const args = action['FunctionCall'].args;
+
+    return {
+      hash: tx.transaction.hash,
+      block_hash: block.header.hash,
+      block_height: block.header.height,
+      timestamp: Number(block.header.timestamp_nanosec),
+      sender_address: tx.transaction.signer_id,
+      receiver_address: tx.transaction.receiver_id,
+      signature: tx.transaction.signature,
+      calldata: args,
     }
   }
 
