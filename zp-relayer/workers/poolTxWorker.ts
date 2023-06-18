@@ -15,8 +15,8 @@ import { checkAssertion } from '../utils/helpers'
 import type { EstimationType, GasPrice } from '../services/GasPrice'
 import { getChainId } from '../utils/web3'
 import { TxPayload } from '../queue/poolTxQueue'
-import { sentTxQueue } from '../queue/sentTxQueue';
 import bs58 from 'bs58';
+import { TxStatus } from '../chains/chain'
 
 const WORKER_OPTIONS = {
   autorun: false,
@@ -36,9 +36,9 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
 
     const logPrefix = `POOL WORKER: Job ${job.id}:`
     logger.info('%s processing...', logPrefix)
-    logger.info('Recieved %s txs', txs.length)
+    logger.info('%s Recieved %s txs', logPrefix, txs.length)
 
-    const txHashes = []
+    const txHashes: string[] = []
     for (const tx of txs) {
       const { gas, amount, rawMemo, txType, txProof, extraData } = tx
 
@@ -53,7 +53,7 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
       const { data, commitIndex } = await pool.chain.processTx(job.id as string, tx, pool)
 
       const nonce = await incrNonce()
-      logger.info(`${logPrefix} nonce: ${nonce}`)
+      logger.info(`%s ${logPrefix} nonce: ${nonce}`, logPrefix)
 
       let gasPriceOptions = {}
       if (gasPrice) {
@@ -71,44 +71,75 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
       }
 
       try {
+        logger.info('%s Sending TX', logPrefix)
         const txHash = await pool.chain.signAndSend({ data, nonce, gas, amount })
-        logger.debug(`${logPrefix} TX hash ${txHash}`)
+        logger.debug(`%s TX hash ${txHash}`, logPrefix)
 
-        await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
-
-        const chainTx = await pool.chain.getTx(txHash)
-        pool.txCache.add(chainTx)
-
+        logger.info('%s Updating optimistic state', logPrefix)
         const truncatedMemo = pool.chain.extractCiphertextFromTx(rawMemo, txType)
         const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
         const txData = numToHex(toBN(outCommit)).concat(hexTxHash).concat(truncatedMemo)
-
         pool.optimisticState.updateState(commitIndex, outCommit, txData)
-        logger.info('Adding nullifier %s to OS', nullifier)
+        await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
         await pool.optimisticState.nullifiers.add([nullifier])
 
         txHashes.push(txHash)
 
-        await sentTxQueue.add(
-          txHash,
-          {
-            payload: tx,
-            outCommit,
-            commitIndex,
-            txHash,
-            txData,
-            nullifier,
-            txConfig,
-          },
-          {
-            delay: config.sentTxDelay,
-            priority: nonce,
-          }
-        )
+        // Check the transaction ================================================================================
+        const MAX_ATTEMPTS = 10
+        let attempts = 0
+        while (true) {
+          logger.info('%s Attempt %d to get transaction status', logPrefix, attempts + 1)
+          const tx = await pool.chain.getTxStatus(txHash)
 
-        const sentTxNum = await sentTxQueue.count()
-        if (sentTxNum > MAX_SENT_LIMIT) {
-          await poolTxWorker.pause()
+          if (tx.status == TxStatus.Mined) {
+            // Successful
+            logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockId)
+
+            const chainTx = await pool.chain.getTx(txHash)
+            pool.txCache.add(chainTx)
+
+            const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
+            // update txData with new txHash
+            const newTxData = txData.slice(0, 64) + hexTxHash + txData.slice(128)
+
+            pool.state.updateState(commitIndex, outCommit, newTxData)
+
+            // Add nullifer to confirmed state and remove from optimistic one
+            logger.info('%s Adding nullifier %s to PS', logPrefix, nullifier)
+            await pool.state.nullifiers.add([nullifier])
+            logger.info('%s Removing nullifier %s from OS', logPrefix, nullifier)
+            await pool.optimisticState.nullifiers.remove([nullifier])
+
+            const node1 = pool.state.getCommitment(commitIndex)
+            const node2 = pool.optimisticState.getCommitment(commitIndex)
+            logger.info(`%s Assert commitments are equal: ${node1}, ${node2}`, logPrefix)
+            if (node1 !== node2) {
+              logger.error('%s Commitments are not equal', logPrefix)
+            }
+
+            return txHash
+          } else if (tx.status == TxStatus.FatalError || tx.status == TxStatus.RecoverableError || attempts == MAX_ATTEMPTS) {
+            if (tx.status == TxStatus.RecoverableError) {
+              logger.warn('%s Transaction %s is in recoverable error state', logPrefix, txHash)
+              logger.warn('%s !!! Recovery unimplemented, reverting optimistic state', logPrefix)
+            }
+
+            logger.error('%s Transaction %s failed with error: %s', logPrefix, txHash, tx.error)
+
+            logger.info('%s Rollback optimistic state...', logPrefix)
+            pool.optimisticState.rollbackTo(pool.state)
+            await pool.optimisticState.nullifiers.clear()
+            const root1 = pool.state.getMerkleRoot()
+            const root2 = pool.optimisticState.getMerkleRoot()
+            logger.debug(`%s Assert roots are equal: ${root1}, ${root2}, ${root1 === root2}`, logPrefix)
+
+            return null
+          }
+
+          logger.info('%s Transaction %s is not mined yet, retrying...', logPrefix, txHash)
+          attempts++
+          await new Promise(resolve => setTimeout(resolve, 3000))
         }
       } catch (e) {
         logger.error(`${logPrefix} Send TX failed: ${e}`)

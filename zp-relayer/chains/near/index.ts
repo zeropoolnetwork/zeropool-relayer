@@ -6,8 +6,10 @@ import {
   Contract,
   Account,
   providers,
+  DEFAULT_FUNCTION_CALL_GAS,
+  Connection,
 } from 'near-api-js'
-import { FinalExecutionStatusBasic } from 'near-api-js/lib/providers'
+import { FinalExecutionOutcome, FinalExecutionStatusBasic } from 'near-api-js/lib/providers'
 import { BinaryWriter, BinaryReader } from '../../utils/binary'
 import BN from 'bn.js'
 import { TxType } from 'zp-memo-parser'
@@ -21,6 +23,8 @@ import { TxPayload } from '../../queue/poolTxQueue'
 import { Pool } from '../../pool'
 import { parseDelta } from '../../validateTx'
 import { numToHex, truncateHexPrefix } from '../../utils/helpers';
+import { ChangeFunctionCallOptions } from 'near-api-js/lib/account'
+import { functionCall } from 'near-api-js/lib/transaction'
 
 const MAX_GAS = new BN('300000000000000')
 
@@ -87,9 +91,22 @@ export interface NearConfig {
   tokenId: string
 }
 
+class AsyncAccount extends Account {
+  constructor(connection: Connection, accountId: string) {
+    super(connection, accountId)
+  }
+
+  async functionCallCustom(contractId: string, methodName: string, args: Buffer, gas: BN, attachedDeposit: BN): Promise<string> {
+    const action = functionCall(methodName, args, gas, attachedDeposit, (args: any) => args, false)
+    const [txHash, signedTx] = await this.signTransaction(contractId, [action])
+    await this.connection.provider.sendTransaction(signedTx)
+    return bs58.encode(txHash)
+  }
+}
+
 export class NearChain extends Chain {
   near: Near = null!
-  account: Account = null!
+  account: AsyncAccount = null!
   config: NearConfig = null!
 
   static async create(config: NearConfig): Promise<NearChain> {
@@ -108,7 +125,7 @@ export class NearChain extends Chain {
     }
 
     self.near = await connect(connectionConfig)
-    self.account = await self.near.account(config.relayerAccountId)
+    self.account = new AsyncAccount(self.near.connection, config.relayerAccountId)
     // this.poolContract = new Contract(this.account, config.poolContractId, {
     //   changeMethods: ['transact', 'lock', 'release'],
     //   viewMethods: ['pool_index', 'merkle_root'],
@@ -172,20 +189,50 @@ export class NearChain extends Chain {
     return deserializePoolData(Buffer.from(tx, 'base64'));
   }
 
-  async getTxStatus(txId: any): Promise<{ status: TxStatus, blockId?: any }> {
+  async getTxStatus(txId: any): Promise<{ status: TxStatus, blockId?: any, error?: string }> {
     const provider = this.near.connection.provider
-    const result = await provider.txStatus(txId, this.account.accountId)
-    let status
+
+    let result
+    try {
+      result = await provider.txStatus(txId, this.account.accountId)
+    } catch (err: any) {
+      return { status: TxStatus.FatalError, error: err.toString() }
+    }
+
+    let status, error
 
     switch (result.status) {
-      case FinalExecutionStatusBasic.Failure: status = TxStatus.Error; break
-      default: status = TxStatus.Mined
+      case FinalExecutionStatusBasic.Failure:
+        status = TxStatus.FatalError;
+        break
+      case FinalExecutionStatusBasic.NotStarted:
+      case FinalExecutionStatusBasic.Started:
+        status = TxStatus.Pending;
+        break
+      default: {
+        if (typeof result.status.SuccessValue !== 'undefined') {
+          status = TxStatus.Mined
+        } else if (typeof result.status.Failure !== 'undefined') {
+          if (['InvalidNonce', 'Expired'].includes(result.status.Failure.error_type)) {
+            status = TxStatus.RecoverableError
+          } else {
+            status = TxStatus.FatalError
+          }
+          error = result.status.Failure.error_message
+        } else {
+          status = TxStatus.FatalError
+          error = 'Unknown error'
+        }
+      }
     }
 
-    return {
+    const res = {
       status,
-      blockId: result.transaction
+      blockId: result.transaction,
+      error,
     }
+
+    return res
   }
 
   async getTx(txId: string): Promise<any> {
@@ -243,6 +290,20 @@ export class NearChain extends Chain {
   }
 
   async signAndSend(txConfig: { data: string, nonce: string, gas: string, amount: string }): Promise<string> {
+    logger.debug('Signing and sending tx: %o', txConfig)
+
+    // const hash = await this.account.functionCallCustom(
+    //   this.config.poolContractId,
+    //   'transact',
+    //   Buffer.from(txConfig.data, 'base64'),
+    //   MAX_GAS,
+    //   new BN(0),
+    // )
+
+    // logger.debug('Transaction hash: %o', hash)
+
+    // return hash
+
     const res = await this.account.functionCall({
       contractId: this.config.poolContractId,
       methodName: 'transact',

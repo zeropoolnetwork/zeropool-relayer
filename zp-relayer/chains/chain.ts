@@ -7,8 +7,9 @@ export type MessageEvent = { data: string, transactionHash: string }
 
 export enum TxStatus {
   Mined,
-  Missing,
-  Error,
+  Pending,
+  RecoverableError,
+  FatalError,
 }
 
 export abstract class Chain {
@@ -21,7 +22,7 @@ export abstract class Chain {
 
   abstract signAndSend(txConfig: any): Promise<string>
 
-  abstract getTxStatus(txId: any): Promise<{ status: TxStatus, blockId?: any }>
+  abstract getTxStatus(txId: any): Promise<{ status: TxStatus, blockId?: any, error?: string }>
 
   abstract parseCalldata(tx: string): PoolCalldata
 

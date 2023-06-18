@@ -89,16 +89,18 @@ class Pool {
     }
 
     const fromBlock = Number(await readLatestCheckedBlock())
-    let latestBlockId = fromBlock
-    const numTxs = Math.floor((contractIndex - localIndex) / OUTPLUSONE)
+    const numLocalTxs = localIndex / OUTPLUSONE
+    const numContractTxs = contractIndex / OUTPLUSONE
+    const numTxsToUpdate = Math.floor((contractIndex - localIndex) / OUTPLUSONE)
 
     const txs = this.txCache.load()
 
-    if (txs.length !== numTxs) {
-      logger.error(`Number of loaded transactions does not match number of transactions in contract. Expected ${numTxs}, got ${txs.length}`)
+    if (txs.length !== numContractTxs) {
+      logger.error(`Number of loaded transactions does not match number of transactions in contract. Expected ${numContractTxs}, got ${txs.length}`)
     }
 
-    for (let i = 0; i < txs.length; i++) {
+    logger.info(`Loading ${numTxsToUpdate} transactions`)
+    for (let i = numLocalTxs; i < numTxsToUpdate; i++) {
       let tx = txs[i]
 
       if (!tx.calldata) {
@@ -122,7 +124,10 @@ class Pool {
       }
     }
 
-    await updateField(RelayerKeys.LATEST_CHECKED_BLOCK, latestBlockId)
+    if (contractRoot !== this.state.getMerkleRoot()) {
+      throw new Error(`Contract root ${contractRoot} does not match local root ${this.state.getMerkleRoot()}`)
+    }
+
     logger.debug(`LOCAL ROOT AFTER UPDATE ${this.state.getMerkleRoot()}`)
   }
 

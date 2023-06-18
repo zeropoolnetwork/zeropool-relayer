@@ -5,7 +5,6 @@ import config from './config'
 import { Mutex } from 'async-mutex'
 
 import { createPoolTxWorker } from './workers/poolTxWorker'
-import { createSentTxWorker } from './workers/sentTxWorker'
 // import { initializeDomain } from './utils/EIP712SaltedPermit'
 
 export async function init() {
@@ -21,6 +20,4 @@ export async function init() {
   const workerMutex = new Mutex();
   const poolTxWorker = await createPoolTxWorker(workerMutex, gasPriceService)
   poolTxWorker.run()
-  const sendTxWorker = await createSentTxWorker(workerMutex, gasPriceService)
-  sendTxWorker.run()
 }

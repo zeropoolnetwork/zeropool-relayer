@@ -25,7 +25,7 @@ import { web3 } from '../../services/web3';
 import TokenAbi from './token-abi.json';
 import { recoverSaltedPermit } from '../../utils/EIP712SaltedPermit';
 import { ZERO_ADDRESS } from '../../utils/constants'
-import {  } from '../../utils/web3'
+import { } from '../../utils/web3'
 
 export class EvmChain extends Chain {
   web3: Web3 = null!
@@ -127,7 +127,7 @@ export class EvmChain extends Chain {
         blockId = tx.blockNumber
         status = TxStatus.Mined
       } else {
-        status = TxStatus.Error
+        status = TxStatus.FatalError
       }
     } else {
       status = TxStatus.Missing
