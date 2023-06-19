@@ -130,7 +130,7 @@ export class EvmChain extends Chain {
         status = TxStatus.FatalError
       }
     } else {
-      status = TxStatus.Missing
+      status = TxStatus.FatalError
     }
 
     return {
