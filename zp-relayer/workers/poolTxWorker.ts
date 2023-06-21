@@ -8,7 +8,6 @@ import { TX_QUEUE_NAME, OUTPLUSONE, MAX_SENT_LIMIT } from '../utils/constants'
 import { readNonce, updateField, RelayerKeys, incrNonce } from '../utils/redisFields'
 import { numToHex, withMutex } from '../utils/helpers'
 import { pool } from '../pool'
-import config from '../config'
 import { redis } from '../services/redisClient'
 import { checkNullifier, checkTransferIndex, parseDelta } from '../validateTx'
 import { checkAssertion } from '../utils/helpers'
@@ -25,12 +24,6 @@ const WORKER_OPTIONS = {
 }
 
 export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex, gasPrice: GasPrice<T> | null) {
-  let chainId = 0
-  // chainId is only relevant for EVM based chains
-  if (config.chain == 'evm') {
-    chainId = await getChainId(web3)
-  }
-
   const poolTxWorkerProcessor = async (job: Job<TxPayload[]>) => {
     const txs = job.data
 
@@ -55,35 +48,22 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
       const nonce = await incrNonce()
       logger.info(`%s ${logPrefix} nonce: ${nonce}`, logPrefix)
 
-      let gasPriceOptions = {}
-      if (gasPrice) {
-        gasPriceOptions = gasPrice.getPrice()
-      }
-
-      const txConfig = {
-        data,
-        nonce,
-        value: pool.chain.toBaseUnit(toBN(amount)),
-        gas,
-        to: config.poolAddress,
-        chainId: chainId,
-        ...gasPriceOptions,
-      }
-
       try {
-        logger.info('%s Sending TX', logPrefix)
-        const txHash = await pool.chain.signAndSend({ data, nonce, gas, amount })
-        logger.debug(`%s TX hash ${txHash}`, logPrefix)
-
         logger.info('%s Updating optimistic state', logPrefix)
         const truncatedMemo = pool.chain.extractCiphertextFromTx(rawMemo, txType)
-        const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
-        const txData = numToHex(toBN(outCommit)).concat(hexTxHash).concat(truncatedMemo)
+        let txData = numToHex(toBN(outCommit)).concat('0'.repeat(64)).concat(truncatedMemo)
         pool.optimisticState.updateState(commitIndex, outCommit, txData)
         await updateField(RelayerKeys.TRANSFER_NUM, commitIndex * OUTPLUSONE)
         await pool.optimisticState.nullifiers.add([nullifier])
 
+        logger.info('%s Sending TX', logPrefix)
+        const txHash = await pool.chain.signAndSend({ data, nonce, gas, amount })
+        logger.debug(`%s TX hash ${txHash}`, logPrefix)
         txHashes.push(txHash)
+
+        const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
+        txData = numToHex(toBN(outCommit)).concat(hexTxHash).concat(truncatedMemo)
+        pool.optimisticState.updateState(commitIndex, outCommit, txData)
 
         // Check the transaction ================================================================================
         const MAX_ATTEMPTS = 10
@@ -148,10 +128,6 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
     }
 
     return txHashes
-  }
-
-  if (config.chain !== 'near') {
-    await updateField(RelayerKeys.NONCE, await readNonce(true))
   }
 
   const poolTxWorker = new Worker<TxPayload[]>(

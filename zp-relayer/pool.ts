@@ -88,7 +88,6 @@ class Pool {
       return
     }
 
-    const fromBlock = Number(await readLatestCheckedBlock())
     const numLocalTxs = localIndex / OUTPLUSONE
     const numContractTxs = contractIndex / OUTPLUSONE
     const numTxsToUpdate = Math.floor((contractIndex - localIndex) / OUTPLUSONE)
