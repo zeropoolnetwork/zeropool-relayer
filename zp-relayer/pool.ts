@@ -214,8 +214,8 @@ class Pool {
     return this.tree.getProof(noteIndex)
   }
 
-  async getTransactions(limit: number, offset: number) {
-    const txs: (string | null)[] = []
+  async getTransactions(limit: number, offset: number): Promise<string[]> {
+    const txs: string[] = []
     for (let i = 0; i < limit; i++) {
       const tx = this.txs.get(offset + i * OUTPLUSONE)
       if (tx) {
