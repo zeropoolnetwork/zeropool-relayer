@@ -77,7 +77,7 @@ export async function createPoolTxWorker<T extends EstimationType>(mutex: Mutex,
             logger.debug('%s Transaction %s was successfully mined at block %s', logPrefix, txHash, tx.blockId)
 
             const chainTx = await pool.chain.getTx(txHash)
-            pool.txCache.add(chainTx)
+            pool.txCache.add({ calldata: chainTx.calldata, hash: chainTx.hash })
 
             const hexTxHash = Buffer.from(bs58.decode(txHash)).toString('hex')
             // update txData with new txHash

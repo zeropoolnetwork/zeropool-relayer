@@ -11,9 +11,6 @@ import {
   checkSendTransactionErrors,
   checkSendTransactionsErrors,
 } from './validation/validation'
-import { connect, Contract, KeyPair, keyStores, WalletConnection } from 'near-api-js';
-import connectPg from 'pg-promise';
-import { ZeropoolIndexer } from './indexer';
 
 
 const txProof = (() => {
@@ -166,18 +163,6 @@ function getFee(req: Request, res: Response) {
   })
 }
 
-async function getBlockchainTransaction(req: Request, res: Response) {
-  const hash = req.params.hash
-  const indexer = new ZeropoolIndexer(config.indexerUrl)
-  const tx = await indexer.getTransaction(hash)
-
-  if (tx) {
-    res.json(tx)
-  } else {
-    res.status(404).json({ error: 'Transaction not found' })
-  }
-}
-
 function root(req: Request, res: Response) {
   return res.sendStatus(200)
 }
@@ -192,6 +177,5 @@ export default {
   getJob,
   relayerInfo,
   getFee,
-  getBlockchainTransaction,
   root,
 }

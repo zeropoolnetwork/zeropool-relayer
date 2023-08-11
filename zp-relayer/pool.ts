@@ -17,7 +17,6 @@ import { Chain } from './chains/chain'
 // import { EvmChain } from './chains/evm'
 import { NearChain, NearConfig } from './chains/near'
 import { readLatestCheckedBlock, RelayerKeys, updateField } from './utils/redisFields';
-import { ZeropoolIndexer } from './indexer';
 import { WavesChain, WavesConfig } from './chains/waves'
 import { TxCache } from './txCache'
 
